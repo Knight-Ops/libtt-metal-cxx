@@ -1,0 +1,4 @@
+[env]
+TT_LOGGER_LEVEL="off"
+# TT_LOGGER_TYPES="Always,Device,UMD"
+# TT_METAL_RUNTIME_ROOT="~/projects/tt-metal"

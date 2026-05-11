@@ -46,10 +46,15 @@ fn main() {
     );
     require_path(&lib_dir.join("libtt_metal.so"), "TT-Metal shared library");
 
-    let mut build = cxx_build::bridge("src/lib.rs");
+    let mut build = cxx_build::bridge("src/ffi.rs");
     build
-        .file("src/tt_metal_cxx.cc")
+        .file("src/tt_metal_cxx/runtime.cc")
+        .file("src/tt_metal_cxx/device.cc")
+        .file("src/tt_metal_cxx/kernel.cc")
+        .file("src/tt_metal_cxx/program.cc")
+        .file("src/tt_metal_cxx/distributed.cc")
         .include(".")
+        .include("include")
         .include(&include_dir)
         .define("SPDLOG_FMT_EXTERNAL", "1")
         .std("c++20");
@@ -65,6 +70,7 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=dylib=fmt");
+    println!("cargo:rustc-link-lib=dylib=tt_stl");
     println!("cargo:rustc-link-lib=dylib=tt_metal");
     println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
     println!(
@@ -73,9 +79,23 @@ fn main() {
     );
 
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=src/lib.rs");
-    println!("cargo:rerun-if-changed=src/tt_metal_cxx.cc");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx.hpp");
+    println!("cargo:rerun-if-changed=src/lib.rs");
+    println!("cargo:rerun-if-changed=src/device.rs");
+    println!("cargo:rerun-if-changed=src/distributed.rs");
+    println!("cargo:rerun-if-changed=src/ffi.rs");
+    println!("cargo:rerun-if-changed=src/kernel.rs");
+    println!("cargo:rerun-if-changed=src/program.rs");
+    println!("cargo:rerun-if-changed=src/tt_metal_cxx/runtime.cc");
+    println!("cargo:rerun-if-changed=src/tt_metal_cxx/device.cc");
+    println!("cargo:rerun-if-changed=src/tt_metal_cxx/kernel.cc");
+    println!("cargo:rerun-if-changed=src/tt_metal_cxx/program.cc");
+    println!("cargo:rerun-if-changed=src/tt_metal_cxx/distributed.cc");
+    println!("cargo:rerun-if-changed=include/tt_metal_cxx/runtime.hpp");
+    println!("cargo:rerun-if-changed=include/tt_metal_cxx/device.hpp");
+    println!("cargo:rerun-if-changed=include/tt_metal_cxx/kernel.hpp");
+    println!("cargo:rerun-if-changed=include/tt_metal_cxx/program.hpp");
+    println!("cargo:rerun-if-changed=include/tt_metal_cxx/distributed.hpp");
     println!("cargo:rerun-if-env-changed=TT_METAL_INSTALL_DIR");
     println!("cargo:rerun-if-env-changed=TT_METAL_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=TT_METAL_LIB_DIR");
