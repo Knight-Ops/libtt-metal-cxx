@@ -3,7 +3,7 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use libtt_metal_cxx::{
     ComputeKernelConfig, DataMovementKernelConfig, DataMovementProcessor, Device,
-    KernelBuildOptLevel, LogicalCore, MathFidelity, MeshDevice, MeshWorkload, Program,
+    KernelBuildOptLevel, LogicalCore, MathFidelity, MeshDevice, MeshWorkload, Noc, Program,
     available_device_count, pcie_device_count, query_devices,
 };
 
@@ -34,6 +34,22 @@ fn packaged_compute_blank_kernel() -> &'static str {
 
 fn packaged_dataflow_blank_kernel() -> &'static str {
     "tt_metal/kernels/dataflow/blank.cpp"
+}
+
+fn inline_compute_kernel_source() -> &'static str {
+    r#"
+    #include "api/compute/compute_kernel_api.h"
+
+    void kernel_main() {}
+    "#
+}
+
+fn inline_dataflow_kernel_source() -> &'static str {
+    r#"
+    #include "api/dataflow/dataflow_api.h"
+
+    void kernel_main() {}
+    "#
 }
 
 #[test]
@@ -258,6 +274,143 @@ fn program_accepts_custom_kernel_configs_and_enqueues() {
         .expect("workload should accept a program containing kernels");
     mesh.enqueue_workload(&mut workload, true)
         .expect("kernel workload should enqueue successfully");
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn program_accepts_inline_kernel_sources_and_enqueues() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let mut workload = MeshWorkload::create();
+    let mut program = Program::create();
+    let core = LogicalCore::new(0, 0);
+    let mut compute_config = ComputeKernelConfig::new();
+    compute_config
+        .set_math_fidelity(MathFidelity::HiFi4)
+        .set_opt_level(KernelBuildOptLevel::O3)
+        .add_compile_arg(17);
+    let mut dataflow_config =
+        DataMovementKernelConfig::reader().expect("reader data movement config should initialize");
+    dataflow_config
+        .set_processor(DataMovementProcessor::Riscv1)
+        .add_compile_arg(23)
+        .set_opt_level(KernelBuildOptLevel::O2);
+
+    let compute_kernel_id = program
+        .create_compute_kernel_from_string_with_config(
+            inline_compute_kernel_source(),
+            core,
+            &compute_config,
+        )
+        .expect("program should accept inline compute kernel source");
+    let dataflow_kernel_id = program
+        .create_data_movement_kernel_from_string_with_config(
+            inline_dataflow_kernel_source(),
+            core,
+            &dataflow_config,
+        )
+        .expect("program should accept inline data movement kernel source");
+
+    assert_ne!(compute_kernel_id, dataflow_kernel_id);
+
+    workload
+        .add_program_to_full_mesh(&mesh, program)
+        .expect("workload should accept a program containing inline-source kernels");
+    mesh.enqueue_workload(&mut workload, true)
+        .expect("inline-source kernel workload should enqueue successfully");
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn program_runtime_args_round_trip_and_update() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let mut workload = MeshWorkload::create();
+    let mut program = Program::create();
+    let core = LogicalCore::new(0, 0);
+
+    let compute_kernel_id = program
+        .create_compute_kernel(packaged_compute_blank_kernel(), core)
+        .expect("program should accept a blank compute kernel");
+    let dataflow_kernel_id = program
+        .create_data_movement_kernel(
+            packaged_dataflow_blank_kernel(),
+            core,
+            DataMovementProcessor::Riscv1,
+            Noc::Riscv1Default,
+        )
+        .expect("program should accept a blank data movement kernel");
+
+    program
+        .set_runtime_args(compute_kernel_id, core, &[1, 2, 3, 4])
+        .expect("compute runtime args should set");
+    assert_eq!(
+        program
+            .runtime_args(compute_kernel_id, core)
+            .expect("compute runtime args should read back"),
+        vec![1, 2, 3, 4]
+    );
+    program
+        .set_runtime_args(compute_kernel_id, core, &[9, 10, 11, 12])
+        .expect("compute runtime args should update");
+    assert_eq!(
+        program
+            .runtime_args(compute_kernel_id, core)
+            .expect("updated compute runtime args should read back"),
+        vec![9, 10, 11, 12]
+    );
+    let error = program
+        .set_runtime_args(compute_kernel_id, core, &[42, 43])
+        .expect_err("changing compute runtime arg length should be rejected");
+    assert!(
+        error.what().contains("cannot be modified from 4 to 2"),
+        "unexpected error message: {}",
+        error.what()
+    );
+    program
+        .set_common_runtime_args(compute_kernel_id, &[100, 200])
+        .expect("compute common runtime args should set");
+    assert_eq!(
+        program
+            .common_runtime_args(compute_kernel_id)
+            .expect("compute common runtime args should read back"),
+        vec![100, 200]
+    );
+
+    program
+        .set_runtime_args(dataflow_kernel_id, core, &[7, 8, 9])
+        .expect("data movement runtime args should set");
+    assert_eq!(
+        program
+            .runtime_args(dataflow_kernel_id, core)
+            .expect("data movement runtime args should read back"),
+        vec![7, 8, 9]
+    );
+    program
+        .set_common_runtime_args(dataflow_kernel_id, &[300])
+        .expect("data movement common runtime args should set");
+    assert_eq!(
+        program
+            .common_runtime_args(dataflow_kernel_id)
+            .expect("data movement common runtime args should read back"),
+        vec![300]
+    );
+
+    workload
+        .add_program_to_full_mesh(&mesh, program)
+        .expect("workload should accept a program containing runtime args");
+    mesh.enqueue_workload(&mut workload, true)
+        .expect("runtime-args workload should enqueue successfully");
 
     assert!(mesh.close().expect("mesh close should succeed"));
 }

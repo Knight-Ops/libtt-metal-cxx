@@ -28,15 +28,47 @@ pub(crate) mod ffi {
 
         fn runtime_id(self: &ProgramHandle) -> u64;
         fn set_runtime_id(self: Pin<&mut ProgramHandle>, runtime_id: u64);
+        fn set_runtime_args(
+            self: Pin<&mut ProgramHandle>,
+            kernel_id: u32,
+            core_x: u32,
+            core_y: u32,
+            runtime_args: &[u32],
+        ) -> Result<()>;
+        fn get_runtime_args(
+            self: &ProgramHandle,
+            kernel_id: u32,
+            core_x: u32,
+            core_y: u32,
+        ) -> Result<Vec<u32>>;
+        fn set_common_runtime_args(
+            self: Pin<&mut ProgramHandle>,
+            kernel_id: u32,
+            runtime_args: &[u32],
+        ) -> Result<()>;
+        fn get_common_runtime_args(self: &ProgramHandle, kernel_id: u32) -> Result<Vec<u32>>;
         fn create_compute_kernel(
             self: Pin<&mut ProgramHandle>,
             file_name: &str,
             core_x: u32,
             core_y: u32,
         ) -> Result<u32>;
+        fn create_compute_kernel_from_string(
+            self: Pin<&mut ProgramHandle>,
+            kernel_src_code: &str,
+            core_x: u32,
+            core_y: u32,
+        ) -> Result<u32>;
         fn create_compute_kernel_with_config(
             self: Pin<&mut ProgramHandle>,
             file_name: &str,
+            core_x: u32,
+            core_y: u32,
+            config: &ComputeKernelConfigHandle,
+        ) -> Result<u32>;
+        fn create_compute_kernel_from_string_with_config(
+            self: Pin<&mut ProgramHandle>,
+            kernel_src_code: &str,
             core_x: u32,
             core_y: u32,
             config: &ComputeKernelConfigHandle,
@@ -49,9 +81,24 @@ pub(crate) mod ffi {
             processor: u8,
             noc: u8,
         ) -> Result<u32>;
+        fn create_data_movement_kernel_from_string(
+            self: Pin<&mut ProgramHandle>,
+            kernel_src_code: &str,
+            core_x: u32,
+            core_y: u32,
+            processor: u8,
+            noc: u8,
+        ) -> Result<u32>;
         fn create_data_movement_kernel_with_config(
             self: Pin<&mut ProgramHandle>,
             file_name: &str,
+            core_x: u32,
+            core_y: u32,
+            config: &DataMovementKernelConfigHandle,
+        ) -> Result<u32>;
+        fn create_data_movement_kernel_from_string_with_config(
+            self: Pin<&mut ProgramHandle>,
+            kernel_src_code: &str,
             core_x: u32,
             core_y: u32,
             config: &DataMovementKernelConfigHandle,

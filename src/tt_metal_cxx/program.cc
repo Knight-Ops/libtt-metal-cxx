@@ -25,6 +25,13 @@ std::string require_kernel_path(rust::Str file_name) {
     return std::string(file_name);
 }
 
+std::string require_kernel_source(rust::Str kernel_src_code) {
+    if (kernel_src_code.empty()) {
+        throw std::invalid_argument("kernel source code must not be empty");
+    }
+    return std::string(kernel_src_code);
+}
+
 }  // namespace
 
 ProgramHandle::ProgramHandle(tt::tt_metal::Program&& program) noexcept :
@@ -56,6 +63,12 @@ std::uint32_t ProgramHandle::create_compute_kernel(rust::Str file_name, std::uin
         file_name, core_x, core_y, *create_compute_kernel_config());
 }
 
+std::uint32_t ProgramHandle::create_compute_kernel_from_string(
+    rust::Str kernel_src_code, std::uint32_t core_x, std::uint32_t core_y) {
+    return create_compute_kernel_from_string_with_config(
+        kernel_src_code, core_x, core_y, *create_compute_kernel_config());
+}
+
 std::uint32_t ProgramHandle::create_compute_kernel_with_config(
     rust::Str file_name,
     std::uint32_t core_x,
@@ -73,6 +86,23 @@ std::uint32_t ProgramHandle::create_compute_kernel_with_config(
     return kernel_id;
 }
 
+std::uint32_t ProgramHandle::create_compute_kernel_from_string_with_config(
+    rust::Str kernel_src_code,
+    std::uint32_t core_x,
+    std::uint32_t core_y,
+    const ComputeKernelConfigHandle& config) {
+    if (config.config_ == nullptr) {
+        throw std::invalid_argument("compute kernel config is invalid");
+    }
+
+    const auto kernel_id = tt::tt_metal::CreateKernelFromString(
+        *program_,
+        require_kernel_source(kernel_src_code),
+        make_core_coord(core_x, core_y),
+        *config.config_);
+    return kernel_id;
+}
+
 std::uint32_t ProgramHandle::create_data_movement_kernel(
     rust::Str file_name,
     std::uint32_t core_x,
@@ -83,6 +113,18 @@ std::uint32_t ProgramHandle::create_data_movement_kernel(
     config->set_processor(processor);
     config->set_noc(noc);
     return create_data_movement_kernel_with_config(file_name, core_x, core_y, *config);
+}
+
+std::uint32_t ProgramHandle::create_data_movement_kernel_from_string(
+    rust::Str kernel_src_code,
+    std::uint32_t core_x,
+    std::uint32_t core_y,
+    std::uint8_t processor,
+    std::uint8_t noc) {
+    auto config = create_data_movement_kernel_config();
+    config->set_processor(processor);
+    config->set_noc(noc);
+    return create_data_movement_kernel_from_string_with_config(kernel_src_code, core_x, core_y, *config);
 }
 
 std::uint32_t ProgramHandle::create_data_movement_kernel_with_config(
@@ -97,6 +139,23 @@ std::uint32_t ProgramHandle::create_data_movement_kernel_with_config(
     const auto kernel_id = tt::tt_metal::CreateKernel(
         *program_,
         require_kernel_path(file_name),
+        make_core_coord(core_x, core_y),
+        *config.config_);
+    return kernel_id;
+}
+
+std::uint32_t ProgramHandle::create_data_movement_kernel_from_string_with_config(
+    rust::Str kernel_src_code,
+    std::uint32_t core_x,
+    std::uint32_t core_y,
+    const DataMovementKernelConfigHandle& config) {
+    if (config.config_ == nullptr) {
+        throw std::invalid_argument("data movement kernel config is invalid");
+    }
+
+    const auto kernel_id = tt::tt_metal::CreateKernelFromString(
+        *program_,
+        require_kernel_source(kernel_src_code),
         make_core_coord(core_x, core_y),
         *config.config_);
     return kernel_id;

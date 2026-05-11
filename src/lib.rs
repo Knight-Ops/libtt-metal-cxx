@@ -3,6 +3,7 @@ mod distributed;
 mod ffi;
 mod kernel;
 mod program;
+mod runtime_args;
 
 pub use cxx::Exception;
 pub use device::{Device, DeviceCounts, available_device_count, pcie_device_count, query_devices};

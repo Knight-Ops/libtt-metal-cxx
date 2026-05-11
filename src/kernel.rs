@@ -300,6 +300,16 @@ impl DataMovementKernelConfig {
 }
 
 impl Program {
+    pub fn create_compute_kernel_from_string(
+        &mut self,
+        kernel_src_code: &str,
+        core: LogicalCore,
+    ) -> Result<KernelId, Exception> {
+        self.inner
+            .pin_mut()
+            .create_compute_kernel_from_string(kernel_src_code, core.x, core.y)
+    }
+
     pub fn create_compute_kernel(
         &mut self,
         file_name: &str,
@@ -308,6 +318,25 @@ impl Program {
         self.inner
             .pin_mut()
             .create_compute_kernel(file_name, core.x, core.y)
+    }
+
+    pub fn create_compute_kernel_from_string_with_config(
+        &mut self,
+        kernel_src_code: &str,
+        core: LogicalCore,
+        config: &ComputeKernelConfig,
+    ) -> Result<KernelId, Exception> {
+        self.inner
+            .pin_mut()
+            .create_compute_kernel_from_string_with_config(
+                kernel_src_code,
+                core.x,
+                core.y,
+                config
+                    .inner
+                    .as_ref()
+                    .expect("compute kernel config handle should exist"),
+            )
     }
 
     pub fn create_compute_kernel_with_config(
@@ -343,6 +372,24 @@ impl Program {
         )
     }
 
+    pub fn create_data_movement_kernel_from_string(
+        &mut self,
+        kernel_src_code: &str,
+        core: LogicalCore,
+        processor: DataMovementProcessor,
+        noc: Noc,
+    ) -> Result<KernelId, Exception> {
+        self.inner
+            .pin_mut()
+            .create_data_movement_kernel_from_string(
+                kernel_src_code,
+                core.x,
+                core.y,
+                processor.as_ffi(),
+                noc.as_ffi(),
+            )
+    }
+
     pub fn create_data_movement_kernel_with_config(
         &mut self,
         file_name: &str,
@@ -353,6 +400,25 @@ impl Program {
             .pin_mut()
             .create_data_movement_kernel_with_config(
                 file_name,
+                core.x,
+                core.y,
+                config
+                    .inner
+                    .as_ref()
+                    .expect("data movement kernel config handle should exist"),
+            )
+    }
+
+    pub fn create_data_movement_kernel_from_string_with_config(
+        &mut self,
+        kernel_src_code: &str,
+        core: LogicalCore,
+        config: &DataMovementKernelConfig,
+    ) -> Result<KernelId, Exception> {
+        self.inner
+            .pin_mut()
+            .create_data_movement_kernel_from_string_with_config(
+                kernel_src_code,
                 core.x,
                 core.y,
                 config
