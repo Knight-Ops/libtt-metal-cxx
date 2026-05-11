@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rust/cxx.h"
+
 namespace tt_metal_cxx::detail {
 
 void ensure_runtime_root();
@@ -13,3 +15,9 @@ void note_mesh_opened();
 void note_mesh_closed();
 
 }  // namespace tt_metal_cxx::detail
+
+namespace tt_metal_cxx {
+
+void throw_invalid_argument(rust::Str message);
+
+}  // namespace tt_metal_cxx

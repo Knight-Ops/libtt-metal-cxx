@@ -1,15 +1,51 @@
 #include "tt_metal_cxx/device.hpp"
 
+#include <memory>
 #include <stdexcept>
 
 #include <tt-metalium/host_api.hpp>
 
 #include "tt_metal_cxx/runtime.hpp"
 
+namespace tt_metal_cxx::detail {
+
+struct DeviceContext {
+    DeviceContext(tt::tt_metal::IDevice* device_ptr, std::int32_t chip_id) noexcept :
+        device(device_ptr), device_id(chip_id) {
+        note_device_opened();
+    }
+
+    ~DeviceContext() {
+        try {
+            release();
+        } catch (...) {
+        }
+    }
+
+    bool release() {
+        if (device == nullptr) {
+            return false;
+        }
+
+        auto* raw_device = device;
+        device = nullptr;
+        const bool closed = tt::tt_metal::CloseDevice(raw_device);
+        note_device_closed();
+        maybe_release_ownership();
+        return closed;
+    }
+
+    bool is_open() const noexcept { return device != nullptr; }
+
+    tt::tt_metal::IDevice* device;
+    std::int32_t device_id;
+};
+
+}  // namespace tt_metal_cxx::detail
+
 namespace tt_metal_cxx {
 
-DeviceHandle::DeviceHandle(tt::tt_metal::IDevice* device, std::int32_t device_id) noexcept :
-    device_(device), device_id_(device_id) {}
+DeviceHandle::DeviceHandle(std::shared_ptr<detail::DeviceContext> context) noexcept : context_(std::move(context)) {}
 
 DeviceHandle::~DeviceHandle() {
     try {
@@ -19,24 +55,32 @@ DeviceHandle::~DeviceHandle() {
 }
 
 bool DeviceHandle::close() {
-    if (device_ == nullptr) {
+    if (context_ == nullptr) {
         return false;
     }
 
-    auto* device = device_;
-    device_ = nullptr;
-    const bool closed = tt::tt_metal::CloseDevice(device);
-    detail::note_device_closed();
-    detail::maybe_release_ownership();
-    return closed;
+    auto context = std::move(context_);
+    context_.reset();
+    if (context.use_count() == 1) {
+        return context->release();
+    }
+    return true;
 }
 
 bool DeviceHandle::is_open() const noexcept {
-    return device_ != nullptr;
+    return context_ != nullptr;
 }
 
 std::int32_t DeviceHandle::device_id() const noexcept {
-    return device_id_;
+    return context_ != nullptr ? context_->device_id : -1;
+}
+
+tt::tt_metal::IDevice* DeviceHandle::raw_device() const noexcept {
+    return context_ != nullptr ? context_->device : nullptr;
+}
+
+std::shared_ptr<detail::DeviceContext> DeviceHandle::context() const noexcept {
+    return context_;
 }
 
 std::unique_ptr<DeviceHandle> create_device(std::int32_t device_id) {
@@ -57,8 +101,7 @@ std::unique_ptr<DeviceHandle> create_device(std::int32_t device_id) {
     }
 
     detail::register_atexit_cleanup();
-    detail::note_device_opened();
-    return std::make_unique<DeviceHandle>(device, device_id);
+    return std::make_unique<DeviceHandle>(std::make_shared<detail::DeviceContext>(device, device_id));
 }
 
 std::size_t get_num_available_devices() {

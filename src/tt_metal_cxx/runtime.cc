@@ -13,6 +13,14 @@ namespace tt::tt_metal::detail {
 void ReleaseOwnership();
 }
 
+namespace tt_metal_cxx {
+
+void throw_invalid_argument(rust::Str message) {
+    throw std::invalid_argument(std::string(message));
+}
+
+}  // namespace tt_metal_cxx
+
 namespace tt_metal_cxx::detail {
 
 namespace {

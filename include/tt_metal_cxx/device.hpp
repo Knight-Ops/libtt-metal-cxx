@@ -8,11 +8,15 @@ namespace tt::tt_metal {
 class IDevice;
 }
 
+namespace tt_metal_cxx::detail {
+struct DeviceContext;
+}
+
 namespace tt_metal_cxx {
 
 class DeviceHandle {
 public:
-    DeviceHandle(tt::tt_metal::IDevice* device, std::int32_t device_id) noexcept;
+    explicit DeviceHandle(std::shared_ptr<detail::DeviceContext> context) noexcept;
     ~DeviceHandle();
 
     DeviceHandle(const DeviceHandle&) = delete;
@@ -23,10 +27,11 @@ public:
     bool close();
     bool is_open() const noexcept;
     std::int32_t device_id() const noexcept;
+    tt::tt_metal::IDevice* raw_device() const noexcept;
+    std::shared_ptr<detail::DeviceContext> context() const noexcept;
 
 private:
-    tt::tt_metal::IDevice* device_;
-    std::int32_t device_id_;
+    std::shared_ptr<detail::DeviceContext> context_;
 };
 
 std::unique_ptr<DeviceHandle> create_device(std::int32_t device_id);

@@ -2,9 +2,11 @@ use std::env;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use libtt_metal_cxx::{
-    ComputeKernelConfig, DataMovementKernelConfig, DataMovementProcessor, Device,
-    KernelBuildOptLevel, LogicalCore, MathFidelity, MeshDevice, MeshWorkload, Noc, Program,
-    available_device_count, pcie_device_count, query_devices,
+    Buffer, BufferCreateOptions, BufferType, CircularBufferConfig, ComputeKernelConfig, CoreRange,
+    CoreRangeSet, DataFormat, DataMovementKernelConfig, DataMovementProcessor, Device,
+    InterleavedBufferConfig, KernelBuildOptLevel, LogicalCore, MathFidelity, MeshDevice,
+    MeshWorkload, Noc, Program, ShardOrientation, ShardSpecBuffer, ShardedBufferConfig,
+    TensorMemoryLayout, available_device_count, pcie_device_count, query_devices,
 };
 
 fn device_lock() -> MutexGuard<'static, ()> {
@@ -50,6 +52,43 @@ fn inline_dataflow_kernel_source() -> &'static str {
 
     void kernel_main() {}
     "#
+}
+
+fn single_worker_core() -> LogicalCore {
+    LogicalCore::new(0, 0)
+}
+
+fn second_worker_core() -> LogicalCore {
+    LogicalCore::new(0, 1)
+}
+
+fn single_core_range_set() -> CoreRangeSet {
+    CoreRangeSet::from_core(single_worker_core())
+}
+
+fn multi_range_set() -> CoreRangeSet {
+    CoreRangeSet::from_ranges([
+        CoreRange::from_core(single_worker_core()),
+        CoreRange::from_core(second_worker_core()),
+    ])
+}
+
+fn dram_buffer_config(size: u64) -> InterleavedBufferConfig {
+    InterleavedBufferConfig::new(size, size, BufferType::Dram)
+}
+
+fn l1_buffer_config(size: u64) -> InterleavedBufferConfig {
+    InterleavedBufferConfig::new(size, size, BufferType::L1)
+}
+
+fn single_core_shard_spec() -> ShardSpecBuffer {
+    ShardSpecBuffer::new(
+        single_core_range_set(),
+        [1, 1],
+        ShardOrientation::RowMajor,
+        [1, 1],
+        [1, 1],
+    )
 }
 
 #[test]
@@ -413,4 +452,226 @@ fn program_runtime_args_round_trip_and_update() {
         .expect("runtime-args workload should enqueue successfully");
 
     assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn interleaved_buffers_round_trip_metadata_and_deallocate() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+
+    let mut dram_buffer = Buffer::create_interleaved(
+        &device,
+        dram_buffer_config(4096),
+        BufferCreateOptions::new(),
+    )
+    .expect("DRAM buffer should allocate");
+    assert!(dram_buffer.is_allocated());
+    assert_eq!(dram_buffer.size(), 4096);
+    assert_eq!(dram_buffer.page_size(), 4096);
+    assert_eq!(dram_buffer.buffer_type(), BufferType::Dram);
+    assert_eq!(dram_buffer.buffer_layout(), TensorMemoryLayout::Interleaved);
+    let dram_address = dram_buffer.address();
+    assert!(dram_address > 0);
+    assert!(dram_buffer.deallocate().expect("deallocate should succeed"));
+    assert!(!dram_buffer.is_allocated());
+    assert!(
+        !dram_buffer
+            .deallocate()
+            .expect("second deallocate should be a no-op"),
+        "second deallocate should return false"
+    );
+
+    let l1_buffer =
+        Buffer::create_interleaved(&device, l1_buffer_config(2048), BufferCreateOptions::new())
+            .expect("L1 buffer should allocate");
+    assert!(l1_buffer.is_allocated());
+    assert_eq!(l1_buffer.buffer_type(), BufferType::L1);
+    assert_eq!(l1_buffer.page_size(), 2048);
+}
+
+#[test]
+fn sharded_buffer_round_trips_layout_and_shard_spec() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let config = ShardedBufferConfig::new(
+        2048,
+        2048,
+        BufferType::L1,
+        TensorMemoryLayout::HeightSharded,
+        single_core_shard_spec(),
+    );
+
+    let buffer = Buffer::create_sharded(&device, &config, BufferCreateOptions::new())
+        .expect("sharded L1 buffer should allocate");
+    assert!(buffer.is_allocated());
+    assert_eq!(buffer.buffer_layout(), TensorMemoryLayout::HeightSharded);
+
+    let shard_spec = buffer
+        .shard_spec()
+        .expect("shard spec query should succeed")
+        .expect("sharded buffer should expose its shard spec");
+    assert_eq!(
+        shard_spec.shard_spec.orientation,
+        ShardOrientation::RowMajor
+    );
+    assert_eq!(shard_spec.shard_spec.shape, [1, 1]);
+    assert_eq!(shard_spec.page_shape, [1, 1]);
+    assert_eq!(shard_spec.tensor2d_shape_in_pages, [1, 1]);
+    assert_eq!(shard_spec.grid.ranges(), single_core_range_set().ranges());
+}
+
+#[test]
+fn interleaved_buffer_can_be_recreated_at_fixed_address() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let config = dram_buffer_config(4096);
+    let mut first = Buffer::create_interleaved(&device, config, BufferCreateOptions::new())
+        .expect("first DRAM buffer should allocate");
+    let address = first.address();
+    assert!(first.deallocate().expect("first buffer should deallocate"));
+
+    let second = Buffer::create_interleaved(
+        &device,
+        config,
+        BufferCreateOptions::new().with_address(u64::from(address)),
+    )
+    .expect("fixed-address DRAM buffer should allocate");
+    assert_eq!(second.address(), address);
+    assert!(second.is_allocated());
+}
+
+#[test]
+fn assigned_global_buffer_survives_rust_wrapper_drop() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::create();
+
+    let buffer = Buffer::create_interleaved(
+        &device,
+        dram_buffer_config(4096),
+        BufferCreateOptions::new(),
+    )
+    .expect("DRAM buffer should allocate");
+    program
+        .assign_global_buffer(&buffer)
+        .expect("program should take ownership of the global buffer");
+    drop(buffer);
+
+    program.set_runtime_id(99);
+    assert_eq!(program.runtime_id(), Some(99));
+}
+
+#[test]
+fn program_circular_buffers_and_semaphores_round_trip_and_update() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::create();
+    let replacement =
+        Buffer::create_interleaved(&device, l1_buffer_config(1024), BufferCreateOptions::new())
+            .expect("replacement L1 buffer should allocate");
+
+    let backing =
+        Buffer::create_interleaved(&device, l1_buffer_config(1024), BufferCreateOptions::new())
+            .expect("backing L1 buffer should allocate");
+    let backing_address = backing.address();
+
+    let mut cb_config = CircularBufferConfig::new(256);
+    cb_config
+        .index(0)
+        .set_data_format(DataFormat::RawUInt8)
+        .set_page_size(64)
+        .set_total_size(256);
+    cb_config
+        .index(1)
+        .set_data_format(DataFormat::RawUInt8)
+        .set_page_size(64);
+    cb_config
+        .set_globally_allocated_address(&backing)
+        .expect("circular buffer config should accept a global backing buffer");
+
+    let cb_id = program
+        .create_circular_buffer(&single_core_range_set(), &cb_config)
+        .expect("program should create a circular buffer");
+    drop(backing);
+
+    let initial_snapshot = program
+        .circular_buffer_config(cb_id)
+        .expect("circular buffer config should read back");
+    assert_eq!(initial_snapshot.total_size, 256);
+    assert_eq!(
+        initial_snapshot.globally_allocated_address,
+        Some(backing_address)
+    );
+    assert_eq!(initial_snapshot.indices.len(), 2);
+    assert_eq!(initial_snapshot.indices[0].buffer_index, 0);
+    assert!(!initial_snapshot.indices[0].is_remote);
+    assert_eq!(
+        initial_snapshot.indices[0].data_format,
+        Some(DataFormat::RawUInt8)
+    );
+    assert_eq!(initial_snapshot.indices[0].page_size, Some(64));
+    assert_eq!(initial_snapshot.indices[1].buffer_index, 1);
+    assert!(!initial_snapshot.indices[1].is_remote);
+
+    let single_semaphore = program
+        .create_semaphore(&single_core_range_set(), 7)
+        .expect("single-range semaphore should create");
+    let multi_semaphore = program
+        .create_semaphore(&multi_range_set(), 11)
+        .expect("multi-range semaphore should create");
+    assert_ne!(single_semaphore, multi_semaphore);
+
+    program
+        .update_circular_buffer_total_size(cb_id, 512)
+        .expect("total size update should succeed");
+    program
+        .update_circular_buffer_page_size(cb_id, 0, 128)
+        .expect("page size update should succeed");
+    program
+        .update_dynamic_circular_buffer_address(cb_id, &replacement)
+        .expect("dynamic address update should succeed");
+    program
+        .update_dynamic_circular_buffer_address_with_offset(cb_id, &replacement, 32)
+        .expect("dynamic address+offset update should succeed");
+    program
+        .update_dynamic_circular_buffer_address_and_total_size(cb_id, &replacement, 512)
+        .expect("dynamic address+total-size update should succeed");
+
+    let updated_snapshot = program
+        .circular_buffer_config(cb_id)
+        .expect("updated circular buffer config should read back");
+    assert_eq!(updated_snapshot.total_size, 512);
+    assert_eq!(
+        updated_snapshot.globally_allocated_address,
+        Some(replacement.address())
+    );
+    assert_eq!(updated_snapshot.address_offset, 32);
+    assert_eq!(
+        updated_snapshot
+            .indices
+            .iter()
+            .find(|index| index.buffer_index == 0)
+            .and_then(|index| index.page_size),
+        Some(128)
+    );
 }

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "rust/cxx.h"
 
@@ -11,9 +12,19 @@ class Program;
 
 namespace tt_metal_cxx {
 
+class BufferHandle;
 class ComputeKernelConfigHandle;
+class CircularBufferConfigHandle;
 class DataMovementKernelConfigHandle;
 class MeshWorkloadHandle;
+
+namespace detail {
+struct BufferBacking;
+}
+
+struct CircularBufferIndexConfigRepr;
+struct CircularBufferMetadataRepr;
+struct CoreRangeRepr;
 
 class ProgramHandle {
 public:
@@ -70,8 +81,25 @@ public:
         std::uint32_t core_x,
         std::uint32_t core_y,
         const DataMovementKernelConfigHandle& config);
+    void assign_global_buffer(const BufferHandle& buffer);
+    std::uintptr_t create_circular_buffer(
+        rust::Slice<const CoreRangeRepr> core_ranges, const CircularBufferConfigHandle& config);
+    CircularBufferMetadataRepr get_circular_buffer_metadata(std::uintptr_t cb_handle) const;
+    rust::Vec<CircularBufferIndexConfigRepr> get_circular_buffer_indices(std::uintptr_t cb_handle) const;
+    void update_circular_buffer_total_size(std::uintptr_t cb_handle, std::uint32_t total_size);
+    void update_circular_buffer_page_size(
+        std::uintptr_t cb_handle, std::uint8_t buffer_index, std::uint32_t page_size);
+    void update_dynamic_circular_buffer_address(std::uintptr_t cb_handle, const BufferHandle& buffer);
+    void update_dynamic_circular_buffer_address_with_offset(
+        std::uintptr_t cb_handle, const BufferHandle& buffer, std::uint32_t address_offset);
+    void update_dynamic_circular_buffer_address_and_total_size(
+        std::uintptr_t cb_handle, const BufferHandle& buffer, std::uint32_t total_size);
+    std::uint32_t create_semaphore(rust::Slice<const CoreRangeRepr> core_ranges, std::uint32_t initial_value);
 
 private:
+    void retain_buffer(const std::shared_ptr<detail::BufferBacking>& buffer);
+
+    std::vector<std::shared_ptr<detail::BufferBacking>> retained_buffers_;
     std::unique_ptr<tt::tt_metal::Program> program_;
 
     friend class MeshWorkloadHandle;

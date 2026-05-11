@@ -50,6 +50,7 @@ fn main() {
     build
         .file("src/tt_metal_cxx/runtime.cc")
         .file("src/tt_metal_cxx/device.cc")
+        .file("src/tt_metal_cxx/buffer.cc")
         .file("src/tt_metal_cxx/kernel.cc")
         .file("src/tt_metal_cxx/program.cc")
         .file("src/tt_metal_cxx/runtime_args.cc")
@@ -81,6 +82,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx.hpp");
+    println!("cargo:rerun-if-changed=src/buffer.rs");
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/device.rs");
     println!("cargo:rerun-if-changed=src/distributed.rs");
@@ -90,11 +92,13 @@ fn main() {
     println!("cargo:rerun-if-changed=src/runtime_args.rs");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/runtime.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/device.cc");
+    println!("cargo:rerun-if-changed=src/tt_metal_cxx/buffer.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/kernel.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/program.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/runtime_args.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/distributed.cc");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/runtime.hpp");
+    println!("cargo:rerun-if-changed=include/tt_metal_cxx/buffer.hpp");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/device.hpp");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/kernel.hpp");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/program.hpp");
