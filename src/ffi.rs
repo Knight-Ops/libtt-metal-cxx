@@ -88,6 +88,7 @@ pub(crate) mod ffi {
         type ProgramHandle;
         type ComputeKernelConfigHandle;
         type DataMovementKernelConfigHandle;
+        type MeshBufferHandle;
         type MeshDeviceHandle;
         type MeshWorkloadHandle;
 
@@ -333,5 +334,26 @@ pub(crate) mod ffi {
 
         fn get_num_available_devices() -> Result<usize>;
         fn get_num_pcie_devices() -> Result<usize>;
+
+        fn create_replicated_mesh_buffer(
+            mesh_device: &MeshDeviceHandle,
+            size_bytes: u64,
+            page_size: u64,
+            buffer_type: u8,
+        ) -> Result<UniquePtr<MeshBufferHandle>>;
+        fn address(self: &MeshBufferHandle) -> u32;
+        fn size(self: &MeshBufferHandle) -> u64;
+        fn is_allocated(self: &MeshBufferHandle) -> bool;
+
+        fn write_mesh_buffer(
+            self: &MeshDeviceHandle,
+            buffer: &MeshBufferHandle,
+            data: &[u8],
+        ) -> Result<()>;
+        fn read_mesh_buffer(
+            self: &MeshDeviceHandle,
+            buffer: &MeshBufferHandle,
+            data: &mut [u8],
+        ) -> Result<()>;
     }
 }

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "rust/cxx.h"
+
 namespace tt::tt_metal::distributed {
 class MeshDevice;
 class MeshWorkload;
@@ -11,6 +13,7 @@ class MeshWorkload;
 
 namespace tt_metal_cxx {
 
+class MeshBufferHandle;
 class ProgramHandle;
 
 class MeshWorkloadHandle;
@@ -34,11 +37,20 @@ public:
     std::size_t num_cols() const;
     void enqueue_workload(MeshWorkloadHandle& workload, bool blocking) const;
 
+    void write_mesh_buffer(const MeshBufferHandle& buffer, rust::Slice<const std::uint8_t> data) const;
+    void read_mesh_buffer(const MeshBufferHandle& buffer, rust::Slice<std::uint8_t> data) const;
+
 private:
     std::shared_ptr<tt::tt_metal::distributed::MeshDevice> mesh_device_;
     std::int32_t device_id_;
 
+    friend class MeshBufferHandle;
     friend class MeshWorkloadHandle;
+    friend std::unique_ptr<MeshBufferHandle> create_replicated_mesh_buffer(
+        const MeshDeviceHandle& mesh_device,
+        std::uint64_t size_bytes,
+        std::uint64_t page_size,
+        std::uint8_t buffer_type);
 };
 
 class MeshWorkloadHandle {

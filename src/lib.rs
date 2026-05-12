@@ -3,6 +3,7 @@ mod device;
 mod distributed;
 mod ffi;
 mod kernel;
+mod mesh_buffer;
 mod program;
 mod runtime_args;
 
@@ -19,4 +20,5 @@ pub use kernel::{
     ComputeKernelConfig, DataMovementKernelConfig, DataMovementProcessor, KernelBuildOptLevel,
     KernelId, LogicalCore, MathFidelity, Noc, NocMode, UnpackToDestMode,
 };
+pub use mesh_buffer::MeshBuffer;
 pub use program::{Program, ProgramId};

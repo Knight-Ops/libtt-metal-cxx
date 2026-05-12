@@ -5,9 +5,12 @@
 
 #include <tt-metalium/distributed.hpp>
 #include <tt-metalium/host_api.hpp>
+#include <tt-metalium/mesh_buffer.hpp>
+#include <tt-metalium/mesh_command_queue.hpp>
 #include <tt-metalium/mesh_device.hpp>
 #include <tt-metalium/mesh_workload.hpp>
 
+#include "tt_metal_cxx/mesh_buffer.hpp"
 #include "tt_metal_cxx/program.hpp"
 #include "tt_metal_cxx/runtime.hpp"
 
@@ -142,6 +145,32 @@ std::unique_ptr<MeshDeviceHandle> create_unit_mesh(std::int32_t device_id) {
 
 std::unique_ptr<MeshWorkloadHandle> create_mesh_workload() {
     return std::make_unique<MeshWorkloadHandle>();
+}
+
+void MeshDeviceHandle::write_mesh_buffer(
+    const MeshBufferHandle& buffer, rust::Slice<const std::uint8_t> data) const {
+    if (mesh_device_ == nullptr) {
+        throw std::runtime_error("mesh device is closed");
+    }
+    if (buffer.buffer_ == nullptr) {
+        throw std::runtime_error("mesh buffer handle is invalid");
+    }
+
+    auto& mesh_cq = mesh_device_->mesh_command_queue();
+    mesh_cq.enqueue_write_mesh_buffer(buffer.buffer_, data.data(), true);
+}
+
+void MeshDeviceHandle::read_mesh_buffer(
+    const MeshBufferHandle& buffer, rust::Slice<std::uint8_t> data) const {
+    if (mesh_device_ == nullptr) {
+        throw std::runtime_error("mesh device is closed");
+    }
+    if (buffer.buffer_ == nullptr) {
+        throw std::runtime_error("mesh buffer handle is invalid");
+    }
+
+    auto& mesh_cq = mesh_device_->mesh_command_queue();
+    mesh_cq.enqueue_read_mesh_buffer(data.data(), buffer.buffer_, true);
 }
 
 }  // namespace tt_metal_cxx

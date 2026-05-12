@@ -4,8 +4,8 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 use libtt_metal_cxx::{
     Buffer, BufferCreateOptions, BufferType, CircularBufferConfig, ComputeKernelConfig, CoreRange,
     CoreRangeSet, DataFormat, DataMovementKernelConfig, DataMovementProcessor, Device,
-    InterleavedBufferConfig, KernelBuildOptLevel, LogicalCore, MathFidelity, MeshDevice,
-    MeshWorkload, Noc, Program, ShardOrientation, ShardSpecBuffer, ShardedBufferConfig,
+    InterleavedBufferConfig, KernelBuildOptLevel, LogicalCore, MathFidelity, MeshBuffer,
+    MeshDevice, MeshWorkload, Noc, Program, ShardOrientation, ShardSpecBuffer, ShardedBufferConfig,
     TensorMemoryLayout, available_device_count, pcie_device_count, query_devices,
 };
 
@@ -674,4 +674,50 @@ fn program_circular_buffers_and_semaphores_round_trip_and_update() {
             .and_then(|index| index.page_size),
         Some(128)
     );
+}
+
+#[test]
+fn mesh_buffer_write_read_round_trip() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+
+    const TILE_SIZE: u64 = 32 * 32 * 2; // 32x32 bfloat16 tile = 2048 bytes
+    const BUFFER_SIZE: u64 = TILE_SIZE; // one tile
+
+    // Create a replicated mesh buffer in DRAM
+    let buffer = MeshBuffer::create_replicated(
+        &mesh,
+        BUFFER_SIZE,
+        TILE_SIZE, // page_size = one tile
+        0,         // 0 = DRAM
+    )
+    .expect("mesh buffer should allocate");
+    assert!(buffer.is_allocated());
+    assert_eq!(buffer.size(), BUFFER_SIZE);
+    assert!(buffer.address() > 0);
+
+    // Actually, let's just use a simple pattern
+    let mut input = vec![0u8; BUFFER_SIZE as usize];
+    for (i, byte) in input.iter_mut().enumerate() {
+        *byte = (i % 256) as u8;
+    }
+
+    mesh.write_mesh_buffer(&buffer, &input)
+        .expect("write should succeed");
+
+    // Read back
+    let mut output = vec![0u8; BUFFER_SIZE as usize];
+    mesh.read_mesh_buffer(&buffer, &mut output)
+        .expect("read should succeed");
+
+    assert_eq!(
+        input, output,
+        "mesh buffer read/write round-trip data mismatch"
+    );
+
+    assert!(mesh.close().expect("mesh close should succeed"));
 }

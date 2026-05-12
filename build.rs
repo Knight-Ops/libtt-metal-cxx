@@ -52,6 +52,7 @@ fn main() {
         .file("src/tt_metal_cxx/device.cc")
         .file("src/tt_metal_cxx/buffer.cc")
         .file("src/tt_metal_cxx/kernel.cc")
+        .file("src/tt_metal_cxx/mesh_buffer.cc")
         .file("src/tt_metal_cxx/program.cc")
         .file("src/tt_metal_cxx/runtime_args.cc")
         .file("src/tt_metal_cxx/distributed.cc")
@@ -94,6 +95,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/device.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/buffer.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/kernel.cc");
+    println!("cargo:rerun-if-changed=src/tt_metal_cxx/mesh_buffer.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/program.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/runtime_args.cc");
     println!("cargo:rerun-if-changed=src/tt_metal_cxx/distributed.cc");
@@ -101,6 +103,7 @@ fn main() {
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/buffer.hpp");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/device.hpp");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/kernel.hpp");
+    println!("cargo:rerun-if-changed=include/tt_metal_cxx/mesh_buffer.hpp");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/program.hpp");
     println!("cargo:rerun-if-changed=include/tt_metal_cxx/distributed.hpp");
     println!("cargo:rerun-if-env-changed=TT_METAL_INSTALL_DIR");

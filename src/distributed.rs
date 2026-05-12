@@ -1,5 +1,6 @@
 use crate::Exception;
 use crate::ffi::ffi;
+use crate::mesh_buffer::MeshBuffer;
 use crate::program::Program;
 
 pub struct MeshDevice {
@@ -80,6 +81,26 @@ impl MeshDevice {
             .as_ref()
             .expect("mesh device handle should exist")
             .enqueue_workload(workload.inner.pin_mut(), blocking)
+    }
+
+    /// Write host data to an allocated mesh buffer (blocking).
+    ///
+    /// The data slice length must match the buffer size.
+    pub fn write_mesh_buffer(&self, buffer: &MeshBuffer, data: &[u8]) -> Result<(), Exception> {
+        self.inner
+            .as_ref()
+            .expect("mesh device handle should exist")
+            .write_mesh_buffer(&buffer.inner, data)
+    }
+
+    /// Read device data from an allocated mesh buffer into host memory (blocking).
+    ///
+    /// The data slice length must match the buffer size.
+    pub fn read_mesh_buffer(&self, buffer: &MeshBuffer, data: &mut [u8]) -> Result<(), Exception> {
+        self.inner
+            .as_ref()
+            .expect("mesh device handle should exist")
+            .read_mesh_buffer(&buffer.inner, data)
     }
 }
 

@@ -4,5 +4,6 @@
 #include "tt_metal_cxx/device.hpp"
 #include "tt_metal_cxx/distributed.hpp"
 #include "tt_metal_cxx/kernel.hpp"
+#include "tt_metal_cxx/mesh_buffer.hpp"
 #include "tt_metal_cxx/program.hpp"
 #include "tt_metal_cxx/runtime.hpp"
