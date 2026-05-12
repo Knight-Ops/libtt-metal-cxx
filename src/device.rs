@@ -58,3 +58,50 @@ pub fn available_device_count() -> Result<usize, Exception> {
 pub fn pcie_device_count() -> Result<usize, Exception> {
     Ok(query_devices()?.pcie)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn device_counts_debug_and_eq() {
+        let a = DeviceCounts {
+            available: 1,
+            pcie: 2,
+        };
+        let b = DeviceCounts {
+            available: 1,
+            pcie: 2,
+        };
+        assert_eq!(a, b);
+        assert!(!format!("{a:?}").is_empty());
+    }
+
+    #[test]
+    fn device_counts_not_equal() {
+        let a = DeviceCounts {
+            available: 1,
+            pcie: 2,
+        };
+        let b = DeviceCounts {
+            available: 2,
+            pcie: 2,
+        };
+        assert_ne!(a, b);
+        let c = DeviceCounts {
+            available: 1,
+            pcie: 1,
+        };
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn device_counts_clone() {
+        let a = DeviceCounts {
+            available: 3,
+            pcie: 3,
+        };
+        let b = a;
+        assert_eq!(a, b);
+    }
+}

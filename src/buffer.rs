@@ -949,7 +949,339 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
-    use super::{BufferCreateOptions, SubDeviceId};
+    use super::*;
+
+    #[test]
+    fn buffer_type_display() {
+        assert_eq!(BufferType::Dram.to_string(), "DRAM");
+        assert_eq!(BufferType::L1.to_string(), "L1");
+        assert_eq!(BufferType::SystemMemory.to_string(), "SystemMemory");
+        assert_eq!(BufferType::L1Small.to_string(), "L1Small");
+        assert_eq!(BufferType::Trace.to_string(), "Trace");
+    }
+
+    #[test]
+    fn buffer_type_as_ffi_full() {
+        assert_eq!(BufferType::Dram.as_ffi(), 0);
+        assert_eq!(BufferType::L1.as_ffi(), 1);
+        assert_eq!(BufferType::SystemMemory.as_ffi(), 2);
+        assert_eq!(BufferType::L1Small.as_ffi(), 3);
+        assert_eq!(BufferType::Trace.as_ffi(), 4);
+    }
+
+    #[test]
+    fn buffer_type_from_ffi_round_trip() {
+        for (variant, ffi_val) in [
+            (BufferType::Dram, 0u8),
+            (BufferType::L1, 1),
+            (BufferType::SystemMemory, 2),
+            (BufferType::L1Small, 3),
+            (BufferType::Trace, 4),
+        ] {
+            assert_eq!(BufferType::from_ffi(ffi_val), variant);
+            assert_eq!(BufferType::from_ffi(variant.as_ffi()), variant);
+        }
+    }
+
+    #[test]
+    fn tensor_memory_layout_display() {
+        assert_eq!(TensorMemoryLayout::Interleaved.to_string(), "Interleaved");
+        assert_eq!(
+            TensorMemoryLayout::HeightSharded.to_string(),
+            "HeightSharded"
+        );
+        assert_eq!(TensorMemoryLayout::WidthSharded.to_string(), "WidthSharded");
+        assert_eq!(TensorMemoryLayout::BlockSharded.to_string(), "BlockSharded");
+        assert_eq!(TensorMemoryLayout::NdSharded.to_string(), "NdSharded");
+    }
+
+    #[test]
+    fn tensor_memory_layout_as_ffi_full() {
+        assert_eq!(TensorMemoryLayout::Interleaved.as_ffi(), 0);
+        assert_eq!(TensorMemoryLayout::HeightSharded.as_ffi(), 2);
+        assert_eq!(TensorMemoryLayout::WidthSharded.as_ffi(), 3);
+        assert_eq!(TensorMemoryLayout::BlockSharded.as_ffi(), 4);
+        assert_eq!(TensorMemoryLayout::NdSharded.as_ffi(), 5);
+    }
+
+    #[test]
+    fn tensor_memory_layout_from_ffi_round_trip() {
+        for (variant, ffi_val) in [
+            (TensorMemoryLayout::Interleaved, 0u8),
+            (TensorMemoryLayout::HeightSharded, 2),
+            (TensorMemoryLayout::WidthSharded, 3),
+            (TensorMemoryLayout::BlockSharded, 4),
+            (TensorMemoryLayout::NdSharded, 5),
+        ] {
+            assert_eq!(TensorMemoryLayout::from_ffi(ffi_val), variant);
+            assert_eq!(TensorMemoryLayout::from_ffi(variant.as_ffi()), variant);
+        }
+    }
+
+    #[test]
+    fn shard_orientation_display() {
+        assert_eq!(ShardOrientation::RowMajor.to_string(), "RowMajor");
+        assert_eq!(ShardOrientation::ColMajor.to_string(), "ColMajor");
+    }
+
+    #[test]
+    fn shard_orientation_as_ffi() {
+        assert_eq!(ShardOrientation::RowMajor.as_ffi(), 0);
+        assert_eq!(ShardOrientation::ColMajor.as_ffi(), 1);
+    }
+
+    #[test]
+    fn shard_orientation_from_ffi_round_trip() {
+        assert_eq!(ShardOrientation::from_ffi(0), ShardOrientation::RowMajor);
+        assert_eq!(ShardOrientation::from_ffi(1), ShardOrientation::ColMajor);
+        assert_eq!(
+            ShardOrientation::from_ffi(ShardOrientation::RowMajor.as_ffi()),
+            ShardOrientation::RowMajor
+        );
+        assert_eq!(
+            ShardOrientation::from_ffi(ShardOrientation::ColMajor.as_ffi()),
+            ShardOrientation::ColMajor
+        );
+    }
+
+    #[test]
+    fn data_format_display_selection() {
+        assert_eq!(DataFormat::Float32.to_string(), "Float32");
+        assert_eq!(DataFormat::Bfp2.to_string(), "Bfp2");
+        assert_eq!(DataFormat::Fp8E4M3.to_string(), "Fp8E4M3");
+        assert_eq!(DataFormat::RawUInt8.to_string(), "RawUInt8");
+        assert_eq!(DataFormat::Invalid.to_string(), "Invalid");
+    }
+
+    #[test]
+    fn data_format_from_ffi_round_trip() {
+        for variant in [
+            DataFormat::Float32,
+            DataFormat::Float16,
+            DataFormat::Bfp8,
+            DataFormat::Bfp4,
+            DataFormat::Bfp2,
+            DataFormat::Float16B,
+            DataFormat::Bfp8B,
+            DataFormat::Bfp4B,
+            DataFormat::Bfp2B,
+            DataFormat::Lf8,
+            DataFormat::Fp8E4M3,
+            DataFormat::Int8,
+            DataFormat::Tf32,
+            DataFormat::UInt8,
+            DataFormat::UInt16,
+            DataFormat::Int16,
+            DataFormat::Int32,
+            DataFormat::UInt32,
+            DataFormat::RawUInt8,
+            DataFormat::RawUInt16,
+            DataFormat::RawUInt32,
+            DataFormat::Invalid,
+        ] {
+            assert_eq!(DataFormat::from_ffi(variant.as_ffi()), variant);
+        }
+    }
+
+    #[test]
+    fn core_range_from_core_is_single_point() {
+        let core = LogicalCore::new(2, 3);
+        let range = CoreRange::from_core(core);
+        assert_eq!(range.start, core);
+        assert_eq!(range.end, core);
+    }
+
+    #[test]
+    fn core_range_new_explicit() {
+        let range = CoreRange::new(LogicalCore::new(0, 0), LogicalCore::new(1, 2));
+        assert_eq!(range.start, LogicalCore::new(0, 0));
+        assert_eq!(range.end, LogicalCore::new(1, 2));
+    }
+
+    #[test]
+    fn core_range_set_default_is_empty() {
+        let set = CoreRangeSet::default();
+        assert!(set.is_empty());
+        assert!(set.ranges().is_empty());
+    }
+
+    #[test]
+    fn core_range_set_new_is_empty() {
+        assert!(CoreRangeSet::new().is_empty());
+    }
+
+    #[test]
+    fn core_range_set_from_core() {
+        let set = CoreRangeSet::from_core(LogicalCore::new(0, 0));
+        assert!(!set.is_empty());
+        assert_eq!(set.ranges().len(), 1);
+        assert_eq!(set.ranges()[0].start, LogicalCore::new(0, 0));
+        assert_eq!(set.ranges()[0].end, LogicalCore::new(0, 0));
+    }
+
+    #[test]
+    fn core_range_set_from_range() {
+        let range = CoreRange::from_core(LogicalCore::new(1, 2));
+        let set = CoreRangeSet::from_range(range);
+        assert_eq!(set.ranges().len(), 1);
+        assert_eq!(set.ranges()[0], range);
+    }
+
+    #[test]
+    fn core_range_set_from_ranges() {
+        let set = CoreRangeSet::from_ranges([
+            CoreRange::from_core(LogicalCore::new(0, 0)),
+            CoreRange::from_core(LogicalCore::new(1, 1)),
+        ]);
+        assert_eq!(set.ranges().len(), 2);
+    }
+
+    #[test]
+    fn core_range_set_push_extends() {
+        let mut set = CoreRangeSet::new();
+        assert!(set.is_empty());
+        set.push(CoreRange::from_core(LogicalCore::new(0, 0)));
+        assert!(!set.is_empty());
+        assert_eq!(set.ranges().len(), 1);
+        set.push(CoreRange::from_core(LogicalCore::new(1, 1)));
+        assert_eq!(set.ranges().len(), 2);
+    }
+
+    #[test]
+    fn core_range_set_from_iterator() {
+        let set: CoreRangeSet = [
+            CoreRange::from_core(LogicalCore::new(0, 0)),
+            CoreRange::from_core(LogicalCore::new(1, 1)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(set.ranges().len(), 2);
+    }
+
+    #[test]
+    fn core_range_set_extend() {
+        let mut set = CoreRangeSet::from_core(LogicalCore::new(0, 0));
+        set.extend([CoreRange::from_core(LogicalCore::new(1, 1))]);
+        assert_eq!(set.ranges().len(), 2);
+    }
+
+    #[test]
+    fn core_range_set_from_core_range() {
+        let range = CoreRange::from_core(LogicalCore::new(3, 4));
+        let set = CoreRangeSet::from(range);
+        assert_eq!(set.ranges().len(), 1);
+        assert_eq!(set.ranges()[0], range);
+    }
+
+    #[test]
+    fn core_range_set_from_logical_core() {
+        let set = CoreRangeSet::from(LogicalCore::new(5, 6));
+        assert_eq!(set.ranges().len(), 1);
+        assert_eq!(set.ranges()[0].start, LogicalCore::new(5, 6));
+    }
+
+    #[test]
+    fn core_range_set_into_iter() {
+        let set = CoreRangeSet::from_ranges([
+            CoreRange::from_core(LogicalCore::new(0, 0)),
+            CoreRange::from_core(LogicalCore::new(1, 1)),
+        ]);
+        let mut count = 0;
+        for _range in set {
+            count += 1;
+        }
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn shard_spec_raw_values() {
+        let spec = ShardSpec::new([8, 16], ShardOrientation::ColMajor);
+        assert_eq!(spec.shape, [8, 16]);
+        assert_eq!(spec.orientation, ShardOrientation::ColMajor);
+    }
+
+    #[test]
+    fn shard_spec_buffer_construction() {
+        let grid = CoreRangeSet::from_core(LogicalCore::new(0, 0));
+        let buf = ShardSpecBuffer::new(
+            grid.clone(),
+            [2, 4],
+            ShardOrientation::RowMajor,
+            [1, 1],
+            [2, 4],
+        );
+        assert_eq!(buf.grid, grid);
+        assert_eq!(buf.shard_spec.shape, [2, 4]);
+        assert_eq!(buf.shard_spec.orientation, ShardOrientation::RowMajor);
+        assert_eq!(buf.page_shape, [1, 1]);
+        assert_eq!(buf.tensor2d_shape_in_pages, [2, 4]);
+    }
+
+    #[test]
+    fn tile_config_construction() {
+        let tile = TileConfig::new(32, 32, false);
+        assert_eq!(tile.height, 32);
+        assert_eq!(tile.width, 32);
+        assert!(!tile.transpose_tile);
+
+        let transposed = TileConfig::new(16, 32, true);
+        assert!(transposed.transpose_tile);
+    }
+
+    #[test]
+    fn interleaved_buffer_config_construction() {
+        let config = InterleavedBufferConfig::new(4096, 2048, BufferType::Dram);
+        assert_eq!(config.size, 4096);
+        assert_eq!(config.page_size, 2048);
+        assert_eq!(config.buffer_type, BufferType::Dram);
+    }
+
+    #[test]
+    fn sharded_buffer_config_construction() {
+        let grid = CoreRangeSet::from_core(LogicalCore::new(0, 0));
+        let shard_spec = ShardSpecBuffer::new(
+            grid.clone(),
+            [4, 8],
+            ShardOrientation::ColMajor,
+            [2, 2],
+            [2, 4],
+        );
+        let config = ShardedBufferConfig::new(
+            8192,
+            1024,
+            BufferType::L1,
+            TensorMemoryLayout::WidthSharded,
+            shard_spec.clone(),
+        );
+        assert_eq!(config.size, 8192);
+        assert_eq!(config.page_size, 1024);
+        assert_eq!(config.buffer_type, BufferType::L1);
+        assert_eq!(config.buffer_layout, TensorMemoryLayout::WidthSharded);
+        assert_eq!(config.shard_spec, shard_spec);
+    }
+
+    #[test]
+    fn buffer_create_options_default_is_none() {
+        let opts = BufferCreateOptions::new();
+        assert!(opts.address.is_none());
+        assert!(opts.sub_device_id.is_none());
+    }
+
+    #[test]
+    fn buffer_create_options_with_address_only_ok() {
+        let opts = BufferCreateOptions::new().with_address(0xDEAD_BEEF);
+        assert_eq!(opts.address, Some(0xDEAD_BEEF));
+        assert!(opts.sub_device_id.is_none());
+        assert!(opts.as_ffi().is_ok());
+    }
+
+    #[test]
+    fn buffer_create_options_with_sub_device_only_ok() {
+        let opts = BufferCreateOptions::new().with_sub_device_id(SubDeviceId(7));
+        assert!(opts.address.is_none());
+        assert_eq!(opts.sub_device_id, Some(SubDeviceId(7)));
+        assert!(opts.as_ffi().is_ok());
+    }
 
     #[test]
     fn buffer_create_options_reject_address_and_sub_device_together() {

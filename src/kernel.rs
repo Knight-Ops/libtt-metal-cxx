@@ -388,6 +388,106 @@ impl DataMovementKernelConfig {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn data_movement_processor_display() {
+        assert_eq!(DataMovementProcessor::Riscv0.to_string(), "Riscv0");
+        assert_eq!(DataMovementProcessor::Riscv7.to_string(), "Riscv7");
+    }
+
+    #[test]
+    fn data_movement_processor_as_ffi() {
+        assert_eq!(DataMovementProcessor::Riscv0.as_ffi(), 0);
+        assert_eq!(DataMovementProcessor::Riscv1.as_ffi(), 1);
+        assert_eq!(DataMovementProcessor::Riscv7.as_ffi(), 7);
+    }
+
+    #[test]
+    fn noc_display() {
+        assert_eq!(Noc::Riscv0Default.to_string(), "Riscv0Default");
+        assert_eq!(Noc::Noc1.to_string(), "Noc1");
+    }
+
+    #[test]
+    fn noc_as_ffi() {
+        assert_eq!(Noc::Riscv0Default.as_ffi(), 0);
+        assert_eq!(Noc::Riscv1Default.as_ffi(), 1);
+        assert_eq!(Noc::Noc0.as_ffi(), 2);
+        assert_eq!(Noc::Noc1.as_ffi(), 3);
+    }
+
+    #[test]
+    fn noc_mode_display() {
+        assert_eq!(NocMode::Dedicated.to_string(), "Dedicated");
+        assert_eq!(NocMode::Dynamic.to_string(), "Dynamic");
+    }
+
+    #[test]
+    fn noc_mode_as_ffi() {
+        assert_eq!(NocMode::Dedicated.as_ffi(), 0);
+        assert_eq!(NocMode::Dynamic.as_ffi(), 1);
+    }
+
+    #[test]
+    fn math_fidelity_display() {
+        assert_eq!(MathFidelity::LoFi.to_string(), "LoFi");
+        assert_eq!(MathFidelity::HiFi4.to_string(), "HiFi4");
+    }
+
+    #[test]
+    fn math_fidelity_as_ffi() {
+        assert_eq!(MathFidelity::LoFi.as_ffi(), 0);
+        assert_eq!(MathFidelity::HiFi2.as_ffi(), 2);
+        assert_eq!(MathFidelity::HiFi3.as_ffi(), 3);
+        assert_eq!(MathFidelity::HiFi4.as_ffi(), 4);
+    }
+
+    #[test]
+    fn unpack_to_dest_mode_display() {
+        assert_eq!(
+            UnpackToDestMode::UnpackToDestFp32.to_string(),
+            "UnpackToDestFp32"
+        );
+        assert_eq!(UnpackToDestMode::Default.to_string(), "Default");
+    }
+
+    #[test]
+    fn unpack_to_dest_mode_as_ffi() {
+        assert_eq!(UnpackToDestMode::UnpackToDestFp32.as_ffi(), 0);
+        assert_eq!(UnpackToDestMode::Default.as_ffi(), 1);
+    }
+
+    #[test]
+    fn kernel_build_opt_level_display() {
+        assert_eq!(KernelBuildOptLevel::O1.to_string(), "O1");
+        assert_eq!(KernelBuildOptLevel::O3.to_string(), "O3");
+        assert_eq!(KernelBuildOptLevel::Ofast.to_string(), "Ofast");
+    }
+
+    #[test]
+    fn kernel_build_opt_level_full_as_ffi() {
+        assert_eq!(KernelBuildOptLevel::O1.as_ffi(), 0);
+        assert_eq!(KernelBuildOptLevel::O2.as_ffi(), 1);
+        assert_eq!(KernelBuildOptLevel::O3.as_ffi(), 2);
+        assert_eq!(KernelBuildOptLevel::O0.as_ffi(), 3);
+        assert_eq!(KernelBuildOptLevel::Os.as_ffi(), 4);
+        assert_eq!(KernelBuildOptLevel::Ofast.as_ffi(), 5);
+        assert_eq!(KernelBuildOptLevel::Oz.as_ffi(), 6);
+    }
+
+    #[test]
+    fn logical_core_new_is_copy_and_eq() {
+        let core = LogicalCore::new(3, 5);
+        let copy = core;
+        assert_eq!(core, copy);
+        assert_eq!(core.x, 3);
+        assert_eq!(core.y, 5);
+    }
+}
+
 impl Program {
     pub fn create_compute_kernel_from_string(
         &mut self,

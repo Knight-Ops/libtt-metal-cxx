@@ -335,6 +335,9 @@ pub(crate) mod ffi {
         fn get_num_available_devices() -> Result<usize>;
         fn get_num_pcie_devices() -> Result<usize>;
 
+        fn tilize(data: &[u8], m: u32, n: u32, elem_size: u32) -> Result<Vec<u8>>;
+        fn untilize(data: &[u8], m: u32, n: u32, elem_size: u32) -> Result<Vec<u8>>;
+
         fn create_replicated_mesh_buffer(
             mesh_device: &MeshDeviceHandle,
             size_bytes: u64,

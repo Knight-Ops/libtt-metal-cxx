@@ -7,3 +7,4 @@
 #include "tt_metal_cxx/mesh_buffer.hpp"
 #include "tt_metal_cxx/program.hpp"
 #include "tt_metal_cxx/runtime.hpp"
+#include "tt_metal_cxx/tilize.hpp"

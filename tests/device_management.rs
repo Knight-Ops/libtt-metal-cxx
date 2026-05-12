@@ -5,8 +5,9 @@ use libtt_metal_cxx::{
     Buffer, BufferCreateOptions, BufferType, CircularBufferConfig, ComputeKernelConfig, CoreRange,
     CoreRangeSet, DataFormat, DataMovementKernelConfig, DataMovementProcessor, Device,
     InterleavedBufferConfig, KernelBuildOptLevel, LogicalCore, MathFidelity, MeshBuffer,
-    MeshDevice, MeshWorkload, Noc, Program, ShardOrientation, ShardSpecBuffer, ShardedBufferConfig,
-    TensorMemoryLayout, available_device_count, pcie_device_count, query_devices,
+    MeshDevice, MeshWorkload, Noc, NocMode, Program, ShardOrientation, ShardSpecBuffer,
+    ShardedBufferConfig, TensorMemoryLayout, TileConfig, UnpackToDestMode, available_device_count,
+    pcie_device_count, query_devices, tilize, untilize,
 };
 
 fn device_lock() -> MutexGuard<'static, ()> {
@@ -720,4 +721,665 @@ fn mesh_buffer_write_read_round_trip() {
     );
 
     assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+// ── ComputeKernelConfig: remaining setters ──
+
+#[test]
+fn compute_kernel_config_set_unpack_to_dest_mode_and_enqueue() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let mut workload = MeshWorkload::new();
+    let mut program = Program::new();
+    let core = LogicalCore::new(0, 0);
+
+    let mut compute_config = ComputeKernelConfig::new();
+    compute_config.set_unpack_to_dest_modes_all(UnpackToDestMode::Default);
+
+    program
+        .create_compute_kernel_with_config(packaged_compute_blank_kernel(), core, &compute_config)
+        .expect("compute kernel with unpack_to_dest mode should compile");
+
+    workload
+        .add_program_to_full_mesh(&mesh, program)
+        .expect("workload should accept program");
+    mesh.enqueue_workload(&mut workload, true)
+        .expect("enqueue should succeed");
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn compute_kernel_config_math_fidelity_variants_compile() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let core = LogicalCore::new(0, 0);
+
+    for math_fidelity in [MathFidelity::LoFi, MathFidelity::HiFi2, MathFidelity::HiFi3] {
+        let mut config = ComputeKernelConfig::new();
+        config.set_math_fidelity(math_fidelity);
+        let mut program = Program::new();
+        program
+            .create_compute_kernel_with_config(packaged_compute_blank_kernel(), core, &config)
+            .expect(&format!(
+                "blank compute kernel should compile with {math_fidelity:?}"
+            ));
+    }
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn compute_kernel_config_opt_level_variants_compile() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let core = LogicalCore::new(0, 0);
+
+    for opt_level in [
+        KernelBuildOptLevel::O0,
+        KernelBuildOptLevel::O1,
+        KernelBuildOptLevel::Os,
+        KernelBuildOptLevel::Ofast,
+        KernelBuildOptLevel::Oz,
+    ] {
+        let mut config = ComputeKernelConfig::new();
+        config.set_opt_level(opt_level);
+        let mut program = Program::new();
+        program
+            .create_compute_kernel_with_config(packaged_compute_blank_kernel(), core, &config)
+            .expect(&format!(
+                "blank compute kernel should compile with {opt_level:?}"
+            ));
+    }
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+// ── DataMovementKernelConfig: writer / noc / noc_mode ──
+
+#[test]
+fn data_movement_kernel_config_writer_constructor_works() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let mut program = Program::new();
+    let core = LogicalCore::new(0, 0);
+
+    let mut writer_config =
+        DataMovementKernelConfig::writer().expect("writer config should initialize");
+    writer_config.set_processor(DataMovementProcessor::Riscv0);
+
+    program
+        .create_data_movement_kernel_with_config(
+            packaged_dataflow_blank_kernel(),
+            core,
+            &writer_config,
+        )
+        .expect("program should accept a writer-configured data movement kernel");
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn data_movement_kernel_config_noc_and_noc_mode_compile() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let core = LogicalCore::new(0, 0);
+
+    for (noc, noc_mode) in [
+        (Noc::Noc0, NocMode::Dedicated),
+        (Noc::Noc1, NocMode::Dynamic),
+        (Noc::Riscv0Default, NocMode::Dedicated),
+    ] {
+        let mut config = DataMovementKernelConfig::new();
+        config
+            .set_processor(DataMovementProcessor::Riscv1)
+            .set_noc(noc)
+            .set_noc_mode(noc_mode);
+        let mut program = Program::new();
+        program
+            .create_data_movement_kernel_with_config(
+                packaged_dataflow_blank_kernel(),
+                core,
+                &config,
+            )
+            .expect(&format!(
+                "data movement kernel should compile with {noc:?} {noc_mode:?}"
+            ));
+    }
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn data_movement_kernel_config_opt_level_variants_compile() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let core = LogicalCore::new(0, 0);
+
+    for opt_level in [
+        KernelBuildOptLevel::O0,
+        KernelBuildOptLevel::O1,
+        KernelBuildOptLevel::Os,
+        KernelBuildOptLevel::Ofast,
+        KernelBuildOptLevel::Oz,
+    ] {
+        let mut config = DataMovementKernelConfig::new();
+        config
+            .set_processor(DataMovementProcessor::Riscv1)
+            .set_opt_level(opt_level);
+        let mut program = Program::new();
+        program
+            .create_data_movement_kernel_with_config(
+                packaged_dataflow_blank_kernel(),
+                core,
+                &config,
+            )
+            .expect(&format!(
+                "data movement kernel should compile with {opt_level:?}"
+            ));
+    }
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+// ── Data movement kernel from string (basic 4-arg) ──
+
+#[test]
+fn program_creates_data_movement_kernel_from_string() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+    let mut workload = MeshWorkload::new();
+    let mut program = Program::new();
+    let core = LogicalCore::new(0, 0);
+
+    let kernel_id = program
+        .create_data_movement_kernel_from_string(
+            inline_dataflow_kernel_source(),
+            core,
+            DataMovementProcessor::Riscv1,
+            Noc::Riscv1Default,
+        )
+        .expect("program should accept inline data movement kernel source");
+
+    program
+        .set_runtime_args(kernel_id, core, &[1, 2, 3])
+        .expect("runtime args should set");
+    assert_eq!(
+        program
+            .runtime_args(kernel_id, core)
+            .expect("runtime args should read back"),
+        vec![1, 2, 3]
+    );
+
+    workload
+        .add_program_to_full_mesh(&mesh, program)
+        .expect("workload should accept program");
+    mesh.enqueue_workload(&mut workload, true)
+        .expect("enqueue should succeed");
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+// ── Program: default and runtime_id ──
+
+#[test]
+fn program_default_is_same_as_new() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let p1 = Program::new();
+    let p2 = Program::default();
+    assert_eq!(p1.runtime_id(), p2.runtime_id());
+}
+
+#[test]
+fn program_runtime_id_wraps_u64_max() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut program = Program::new();
+    program.set_runtime_id(u64::MAX);
+    assert_eq!(program.runtime_id(), Some(u64::MAX));
+    program.set_runtime_id(0);
+    assert_eq!(program.runtime_id(), Some(0));
+}
+
+// ── MeshWorkload: creation and default ──
+
+#[test]
+fn mesh_workload_default_is_same_as_new() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+
+    let w1 = MeshWorkload::new();
+    let w2 = MeshWorkload::default();
+    assert_eq!(w1.program_count(), w2.program_count());
+    assert_eq!(w1.program_count(), 0);
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+#[test]
+fn mesh_workload_debug_string() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
+
+    let workload = MeshWorkload::new();
+    assert!(!format!("{workload:?}").is_empty());
+
+    assert!(mesh.close().expect("mesh close should succeed"));
+}
+
+// ── Buffer: sub_device_id ──
+
+#[test]
+fn interleaved_buffer_sub_device_id_is_none_by_default() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let mut device = Device::create(0).expect("device 0 should open");
+
+    let buffer = Buffer::create_interleaved(
+        &device,
+        dram_buffer_config(4096),
+        BufferCreateOptions::new(),
+    )
+    .expect("DRAM buffer should allocate");
+
+    assert!(buffer.sub_device_id().is_none());
+
+    drop(buffer);
+    assert!(device.close().expect("close should succeed"));
+}
+
+// ── CircuarBufferConfig: address_offset ──
+
+#[test]
+fn circular_buffer_config_address_offset_reads_back() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::new();
+
+    let mut cb_config = CircularBufferConfig::new(256);
+    cb_config.set_address_offset(128);
+    cb_config
+        .index(0)
+        .set_data_format(DataFormat::RawUInt8)
+        .set_page_size(64);
+
+    let cb_id = program
+        .create_circular_buffer(&single_core_range_set(), &cb_config)
+        .expect("program should create a circular buffer with address offset");
+
+    let snapshot = program
+        .circular_buffer_config(cb_id)
+        .expect("circular buffer config should read back");
+    assert_eq!(snapshot.address_offset, 128);
+
+    drop(device);
+}
+
+// ── CircuarBufferConfig: set_total_size ──
+
+#[test]
+fn circular_buffer_config_explicit_total_size_reads_back() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::new();
+
+    let mut cb_config = CircularBufferConfig::new(128);
+    cb_config.set_total_size(384);
+    cb_config
+        .index(0)
+        .set_data_format(DataFormat::RawUInt8)
+        .set_page_size(64);
+
+    let cb_id = program
+        .create_circular_buffer(&single_core_range_set(), &cb_config)
+        .expect("program should create a circular buffer");
+
+    let snapshot = program
+        .circular_buffer_config(cb_id)
+        .expect("circular buffer config should read back");
+    assert_eq!(snapshot.total_size, 384);
+
+    drop(device);
+}
+
+// ── CircuarBufferIndex: set_total_size ──
+
+#[test]
+fn circular_buffer_index_total_size_persists() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::new();
+
+    let mut cb_config = CircularBufferConfig::new(256);
+    cb_config
+        .index(0)
+        .set_data_format(DataFormat::RawUInt8)
+        .set_total_size(128)
+        .set_page_size(64);
+
+    let cb_id = program
+        .create_circular_buffer(&single_core_range_set(), &cb_config)
+        .expect("program should create a circular buffer");
+
+    let snapshot = program
+        .circular_buffer_config(cb_id)
+        .expect("circular buffer config should read back");
+    assert_eq!(
+        snapshot.total_size, 128,
+        "index-level total_size takes effect"
+    );
+
+    drop(device);
+}
+
+// ── CircuarBufferIndex: set_tile ──
+
+#[test]
+fn circular_buffer_index_set_tile_reads_back() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::new();
+
+    let mut cb_config = CircularBufferConfig::new(256);
+    let tile = TileConfig::new(32, 32, false);
+    cb_config
+        .index(0)
+        .set_data_format(DataFormat::RawUInt8)
+        .set_page_size(64)
+        .set_tile(tile)
+        .expect("set_tile should succeed with device context");
+
+    let cb_id = program
+        .create_circular_buffer(&single_core_range_set(), &cb_config)
+        .expect("program should create a circular buffer with tile");
+
+    let snapshot = program
+        .circular_buffer_config(cb_id)
+        .expect("circular buffer config should read back");
+    let index_config = &snapshot.indices[0];
+    assert!(index_config.tile.is_some());
+    let back = index_config.tile.unwrap();
+    assert_eq!(back.height, 32);
+    assert_eq!(back.width, 32);
+    assert!(!back.transpose_tile);
+
+    drop(device);
+}
+
+// ── CircuarBufferConfig: remote_index ──
+
+#[test]
+fn circular_buffer_config_can_configure_remote_index() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::new();
+
+    let backing =
+        Buffer::create_interleaved(&device, l1_buffer_config(1024), BufferCreateOptions::new())
+            .expect("backing L1 buffer should allocate");
+
+    let mut cb_config = CircularBufferConfig::new(256);
+    cb_config
+        .set_globally_allocated_address_and_total_size(&backing, 256)
+        .expect("global address and total size should set");
+    cb_config
+        .remote_index(1)
+        .set_data_format(DataFormat::Float16)
+        .set_page_size(64);
+
+    let error = program
+        .create_circular_buffer(&single_core_range_set(), &cb_config)
+        .expect_err("remote index without GlobalCircularBuffer should be rejected");
+    assert!(
+        error.what().contains("Remote buffer indices"),
+        "unexpected error: {}",
+        error.what()
+    );
+
+    drop(device);
+}
+
+// ── Empty CoreRangeSet error paths ──
+
+#[test]
+fn create_circular_buffer_rejects_empty_core_range_set() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::new();
+    let empty_set = CoreRangeSet::new();
+    let cb_config = CircularBufferConfig::new(256);
+
+    let error = program
+        .create_circular_buffer(&empty_set, &cb_config)
+        .expect_err("empty core range set should be rejected");
+    assert!(
+        error.what().contains("at least one core range"),
+        "unexpected error message: {}",
+        error.what()
+    );
+
+    drop(device);
+}
+
+#[test]
+fn create_semaphore_rejects_empty_core_range_set() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let device = Device::create(0).expect("device 0 should open");
+    let mut program = Program::new();
+    let empty_set = CoreRangeSet::new();
+
+    let error = program
+        .create_semaphore(&empty_set, 7)
+        .expect_err("empty core range set should be rejected");
+    assert!(
+        error.what().contains("at least one core range"),
+        "unexpected error message: {}",
+        error.what()
+    );
+
+    drop(device);
+}
+
+// ── tilize / untilize round-trip ──
+
+#[test]
+fn tilize_untilize_round_trip_bf16_single_tile() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let m = 32u32;
+    let n = 32u32;
+    let elem_size = 2u32;
+    let tile_bytes = (m * n * elem_size) as usize;
+
+    let mut input = vec![0u8; tile_bytes];
+    for (i, byte) in input.iter_mut().enumerate() {
+        *byte = (i % 256) as u8;
+    }
+
+    let tilized = tilize(&input, m, n, elem_size).expect("tilize should succeed");
+    assert!(!tilized.is_empty());
+
+    let untilized = untilize(&tilized, m, n, elem_size).expect("untilize should succeed");
+    assert_eq!(input, untilized);
+}
+
+#[test]
+fn tilize_untilize_round_trip_fp32_single_tile() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let m = 32u32;
+    let n = 32u32;
+    let elem_size = 4u32;
+    let tile_bytes = (m * n * elem_size) as usize;
+
+    let mut input = vec![0u8; tile_bytes];
+    for (i, byte) in input.iter_mut().enumerate() {
+        *byte = (i % 256) as u8;
+    }
+
+    let tilized = tilize(&input, m, n, elem_size).expect("tilize should succeed");
+    let untilized = untilize(&tilized, m, n, elem_size).expect("untilize should succeed");
+    assert_eq!(input, untilized);
+}
+
+#[test]
+fn tilize_untilize_round_trip_bf16_four_tiles() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let m = 64u32;
+    let n = 64u32;
+    let elem_size = 2u32;
+    let total_bytes = (m * n * elem_size) as usize;
+
+    let mut input = vec![0u8; total_bytes];
+    for (i, byte) in input.iter_mut().enumerate() {
+        *byte = (i % 256) as u8;
+    }
+
+    let tilized = tilize(&input, m, n, elem_size).expect("tilize should succeed");
+    let untilized = untilize(&tilized, m, n, elem_size).expect("untilize should succeed");
+    assert_eq!(input, untilized);
+}
+
+#[test]
+fn tilize_rejects_non_multiple_of_32() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let data = vec![0u8; 100];
+    let result = tilize(&data, 16, 16, 2);
+    assert!(result.is_err(), "non-32-multiple dimensions should fail");
+}
+
+#[test]
+fn tilize_rejects_empty_input() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let result = tilize(&[], 0, 0, 2);
+    assert!(
+        result.is_err(),
+        "empty input should be rejected by TT-Metal"
+    );
+}
+
+#[test]
+fn untilize_rejects_empty_input() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let result = untilize(&[], 0, 0, 2);
+    assert!(
+        result.is_err(),
+        "empty input should be rejected by TT-Metal"
+    );
+}
+
+#[test]
+fn tilize_rejects_elem_size_1() {
+    if !hardware_tests_enabled() {
+        return;
+    }
+
+    let _guard = device_lock();
+    let m = 32u32;
+    let n = 32u32;
+    let elem_size = 1u32;
+    let tile_bytes = (m * n * elem_size) as usize;
+    let input = vec![0u8; tile_bytes];
+
+    let result = tilize(&input, m, n, elem_size);
+    assert!(
+        result.is_err(),
+        "elem_size=1 should be rejected by TT-Metal"
+    );
 }

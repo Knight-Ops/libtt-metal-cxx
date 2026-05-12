@@ -6,6 +6,7 @@ mod kernel;
 mod mesh_buffer;
 mod program;
 mod runtime_args;
+pub mod tilize;
 
 pub use buffer::{
     Buffer, BufferCreateOptions, BufferType, CircularBufferConfig, CircularBufferConfigSnapshot,
@@ -22,3 +23,4 @@ pub use kernel::{
 };
 pub use mesh_buffer::MeshBuffer;
 pub use program::{Program, ProgramId};
+pub use tilize::{tilize, untilize};
