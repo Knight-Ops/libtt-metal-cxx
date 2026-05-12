@@ -2,3 +2,4 @@
 TT_LOGGER_LEVEL="off"
 # TT_LOGGER_TYPES="Always,Device,UMD"
 # TT_METAL_RUNTIME_ROOT="~/projects/tt-metal"
+TT_METAL_RUN_HARDWARE_TESTS="1"
