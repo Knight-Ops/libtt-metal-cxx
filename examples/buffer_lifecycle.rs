@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let device = Device::create(0)?;
-    let mut program = Program::create();
+    let mut program = Program::new();
 
     let dram_buffer = Buffer::create_interleaved(
         &device,

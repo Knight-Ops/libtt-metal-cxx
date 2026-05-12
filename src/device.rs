@@ -21,6 +21,7 @@ impl Device {
         self.inner.pin_mut().close()
     }
 
+    #[must_use]
     pub fn is_open(&self) -> bool {
         self.inner
             .as_ref()
@@ -28,8 +29,18 @@ impl Device {
             .unwrap_or(false)
     }
 
+    #[must_use]
     pub fn device_id(&self) -> Option<i32> {
         self.inner.as_ref().map(ffi::DeviceHandle::device_id)
+    }
+}
+
+impl std::fmt::Debug for Device {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Device")
+            .field("device_id", &self.device_id())
+            .field("is_open", &self.is_open())
+            .finish()
     }
 }
 

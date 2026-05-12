@@ -198,7 +198,7 @@ fn create_program_starts_with_default_runtime_id() {
     }
 
     let _guard = device_lock();
-    let program = Program::create();
+    let program = Program::new();
     assert_eq!(program.runtime_id(), Some(0));
 }
 
@@ -209,7 +209,7 @@ fn create_program_round_trips_runtime_id() {
     }
 
     let _guard = device_lock();
-    let mut program = Program::create();
+    let mut program = Program::new();
     program.set_runtime_id(42);
     assert_eq!(program.runtime_id(), Some(42));
 }
@@ -221,8 +221,8 @@ fn create_program_instances_are_independent() {
     }
 
     let _guard = device_lock();
-    let mut first = Program::create();
-    let second = Program::create();
+    let mut first = Program::new();
+    let second = Program::new();
 
     first.set_runtime_id(7);
 
@@ -255,8 +255,8 @@ fn mesh_workload_accepts_program_for_full_mesh() {
 
     let _guard = device_lock();
     let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
-    let mut workload = MeshWorkload::create();
-    let program = Program::create();
+    let mut workload = MeshWorkload::new();
+    let program = Program::new();
 
     workload
         .add_program_to_full_mesh(&mesh, program)
@@ -276,8 +276,8 @@ fn program_accepts_custom_kernel_configs_and_enqueues() {
 
     let _guard = device_lock();
     let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
-    let mut workload = MeshWorkload::create();
-    let mut program = Program::create();
+    let mut workload = MeshWorkload::new();
+    let mut program = Program::new();
     let core = LogicalCore::new(0, 0);
     let mut compute_config = ComputeKernelConfig::new();
     compute_config
@@ -325,8 +325,8 @@ fn program_accepts_inline_kernel_sources_and_enqueues() {
 
     let _guard = device_lock();
     let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
-    let mut workload = MeshWorkload::create();
-    let mut program = Program::create();
+    let mut workload = MeshWorkload::new();
+    let mut program = Program::new();
     let core = LogicalCore::new(0, 0);
     let mut compute_config = ComputeKernelConfig::new();
     compute_config
@@ -374,8 +374,8 @@ fn program_runtime_args_round_trip_and_update() {
 
     let _guard = device_lock();
     let mut mesh = MeshDevice::create_unit_mesh(0).expect("unit mesh should open");
-    let mut workload = MeshWorkload::create();
-    let mut program = Program::create();
+    let mut workload = MeshWorkload::new();
+    let mut program = Program::new();
     let core = LogicalCore::new(0, 0);
 
     let compute_kernel_id = program
@@ -560,7 +560,7 @@ fn assigned_global_buffer_survives_rust_wrapper_drop() {
 
     let _guard = device_lock();
     let device = Device::create(0).expect("device 0 should open");
-    let mut program = Program::create();
+    let mut program = Program::new();
 
     let buffer = Buffer::create_interleaved(
         &device,
@@ -585,7 +585,7 @@ fn program_circular_buffers_and_semaphores_round_trip_and_update() {
 
     let _guard = device_lock();
     let device = Device::create(0).expect("device 0 should open");
-    let mut program = Program::create();
+    let mut program = Program::new();
     let replacement =
         Buffer::create_interleaved(&device, l1_buffer_config(1024), BufferCreateOptions::new())
             .expect("replacement L1 buffer should allocate");

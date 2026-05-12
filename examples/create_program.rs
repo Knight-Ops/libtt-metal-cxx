@@ -1,7 +1,7 @@
 use libtt_metal_cxx::Program;
 
 fn main() {
-    let mut program = Program::create();
+    let mut program = Program::new();
     println!("runtime_id={:?}", program.runtime_id());
 
     program.set_runtime_id(1);

@@ -7,12 +7,21 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn create() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: ffi::create_program(),
         }
     }
+}
 
+impl Default for Program {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Program {
+    #[must_use]
     pub fn runtime_id(&self) -> Option<ProgramId> {
         self.inner.as_ref().map(ffi::ProgramHandle::runtime_id)
     }

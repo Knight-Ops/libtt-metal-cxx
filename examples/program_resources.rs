@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let device = Device::create(0)?;
-    let mut program = Program::create();
+    let mut program = Program::new();
     let core0 = LogicalCore::new(0, 0);
     let core1 = LogicalCore::new(0, 1);
     let single_core = CoreRangeSet::from_core(core0);

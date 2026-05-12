@@ -28,7 +28,23 @@ pub enum DataMovementProcessor {
     Riscv7,
 }
 
+impl std::fmt::Display for DataMovementProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Riscv0 => write!(f, "Riscv0"),
+            Self::Riscv1 => write!(f, "Riscv1"),
+            Self::Riscv2 => write!(f, "Riscv2"),
+            Self::Riscv3 => write!(f, "Riscv3"),
+            Self::Riscv4 => write!(f, "Riscv4"),
+            Self::Riscv5 => write!(f, "Riscv5"),
+            Self::Riscv6 => write!(f, "Riscv6"),
+            Self::Riscv7 => write!(f, "Riscv7"),
+        }
+    }
+}
+
 impl DataMovementProcessor {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::Riscv0 => 0,
@@ -51,7 +67,19 @@ pub enum Noc {
     Noc1,
 }
 
+impl std::fmt::Display for Noc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Riscv0Default => write!(f, "Riscv0Default"),
+            Self::Riscv1Default => write!(f, "Riscv1Default"),
+            Self::Noc0 => write!(f, "Noc0"),
+            Self::Noc1 => write!(f, "Noc1"),
+        }
+    }
+}
+
 impl Noc {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::Riscv0Default => 0,
@@ -68,7 +96,17 @@ pub enum NocMode {
     Dynamic,
 }
 
+impl std::fmt::Display for NocMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dedicated => write!(f, "Dedicated"),
+            Self::Dynamic => write!(f, "Dynamic"),
+        }
+    }
+}
+
 impl NocMode {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::Dedicated => 0,
@@ -85,7 +123,19 @@ pub enum MathFidelity {
     HiFi4,
 }
 
+impl std::fmt::Display for MathFidelity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LoFi => write!(f, "LoFi"),
+            Self::HiFi2 => write!(f, "HiFi2"),
+            Self::HiFi3 => write!(f, "HiFi3"),
+            Self::HiFi4 => write!(f, "HiFi4"),
+        }
+    }
+}
+
 impl MathFidelity {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::LoFi => 0,
@@ -102,7 +152,17 @@ pub enum UnpackToDestMode {
     Default,
 }
 
+impl std::fmt::Display for UnpackToDestMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnpackToDestFp32 => write!(f, "UnpackToDestFp32"),
+            Self::Default => write!(f, "Default"),
+        }
+    }
+}
+
 impl UnpackToDestMode {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::UnpackToDestFp32 => 0,
@@ -122,7 +182,22 @@ pub enum KernelBuildOptLevel {
     Oz,
 }
 
+impl std::fmt::Display for KernelBuildOptLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::O1 => write!(f, "O1"),
+            Self::O2 => write!(f, "O2"),
+            Self::O3 => write!(f, "O3"),
+            Self::O0 => write!(f, "O0"),
+            Self::Os => write!(f, "Os"),
+            Self::Ofast => write!(f, "Ofast"),
+            Self::Oz => write!(f, "Oz"),
+        }
+    }
+}
+
 impl KernelBuildOptLevel {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::O1 => 0,
@@ -138,6 +213,13 @@ impl KernelBuildOptLevel {
 
 pub struct ComputeKernelConfig {
     inner: cxx::UniquePtr<ffi::ComputeKernelConfigHandle>,
+}
+
+impl std::fmt::Debug for ComputeKernelConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ComputeKernelConfig")
+            .finish_non_exhaustive()
+    }
 }
 
 impl Default for ComputeKernelConfig {
@@ -220,6 +302,13 @@ impl ComputeKernelConfig {
 
 pub struct DataMovementKernelConfig {
     inner: cxx::UniquePtr<ffi::DataMovementKernelConfigHandle>,
+}
+
+impl std::fmt::Debug for DataMovementKernelConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataMovementKernelConfig")
+            .finish_non_exhaustive()
+    }
 }
 
 impl Default for DataMovementKernelConfig {

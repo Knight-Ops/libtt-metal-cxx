@@ -6,8 +6,25 @@ pub struct MeshDevice {
     pub(crate) inner: cxx::UniquePtr<ffi::MeshDeviceHandle>,
 }
 
+impl std::fmt::Debug for MeshDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MeshDevice")
+            .field("device_id", &self.device_id())
+            .field("is_open", &self.is_open())
+            .finish()
+    }
+}
+
 pub struct MeshWorkload {
     pub(crate) inner: cxx::UniquePtr<ffi::MeshWorkloadHandle>,
+}
+
+impl std::fmt::Debug for MeshWorkload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MeshWorkload")
+            .field("program_count", &self.program_count())
+            .finish()
+    }
 }
 
 impl MeshDevice {
@@ -20,6 +37,7 @@ impl MeshDevice {
         self.inner.pin_mut().close()
     }
 
+    #[must_use]
     pub fn is_open(&self) -> bool {
         self.inner
             .as_ref()
@@ -27,6 +45,7 @@ impl MeshDevice {
             .unwrap_or(false)
     }
 
+    #[must_use]
     pub fn device_id(&self) -> Option<i32> {
         self.inner.as_ref().map(ffi::MeshDeviceHandle::device_id)
     }
@@ -65,12 +84,20 @@ impl MeshDevice {
 }
 
 impl MeshWorkload {
-    pub fn create() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: ffi::create_mesh_workload(),
         }
     }
+}
 
+impl Default for MeshWorkload {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MeshWorkload {
     pub fn add_program_to_full_mesh(
         &mut self,
         mesh_device: &MeshDevice,
@@ -85,6 +112,7 @@ impl MeshWorkload {
         )
     }
 
+    #[must_use]
     pub fn program_count(&self) -> usize {
         self.inner
             .as_ref()

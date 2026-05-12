@@ -15,8 +15,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut mesh = MeshDevice::create_unit_mesh(0)?;
-    let mut workload = MeshWorkload::create();
-    let mut program = Program::create();
+    let mut workload = MeshWorkload::new();
+    let mut program = Program::new();
     let core = LogicalCore::new(0, 0);
     let kernel_id = program.create_data_movement_kernel(
         "tt_metal/kernels/dataflow/blank.cpp",

@@ -108,4 +108,5 @@ fn main() {
     println!("cargo:rerun-if-env-changed=TT_METAL_LIB_DIR");
     println!("cargo:rerun-if-env-changed=TT_METAL_HOME");
     println!("cargo:rerun-if-env-changed=TT_METAL_RUNTIME_ROOT");
+    println!("cargo:rerun-if-changed=tests/");
 }

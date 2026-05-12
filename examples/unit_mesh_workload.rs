@@ -21,8 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         mesh.num_devices()?
     );
 
-    let mut workload = MeshWorkload::create();
-    workload.add_program_to_full_mesh(&mesh, Program::create())?;
+    let mut workload = MeshWorkload::new();
+    workload.add_program_to_full_mesh(&mesh, Program::new())?;
     println!("Workload program_count={}", workload.program_count());
     mesh.enqueue_workload(&mut workload, true)?;
     println!("Enqueued workload successfully");

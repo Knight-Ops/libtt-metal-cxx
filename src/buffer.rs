@@ -26,7 +26,20 @@ pub enum BufferType {
     Trace,
 }
 
+impl std::fmt::Display for BufferType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dram => write!(f, "DRAM"),
+            Self::L1 => write!(f, "L1"),
+            Self::SystemMemory => write!(f, "SystemMemory"),
+            Self::L1Small => write!(f, "L1Small"),
+            Self::Trace => write!(f, "Trace"),
+        }
+    }
+}
+
 impl BufferType {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::Dram => 0,
@@ -58,7 +71,20 @@ pub enum TensorMemoryLayout {
     NdSharded,
 }
 
+impl std::fmt::Display for TensorMemoryLayout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Interleaved => write!(f, "Interleaved"),
+            Self::HeightSharded => write!(f, "HeightSharded"),
+            Self::WidthSharded => write!(f, "WidthSharded"),
+            Self::BlockSharded => write!(f, "BlockSharded"),
+            Self::NdSharded => write!(f, "NdSharded"),
+        }
+    }
+}
+
 impl TensorMemoryLayout {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::Interleaved => 0,
@@ -87,7 +113,17 @@ pub enum ShardOrientation {
     ColMajor,
 }
 
+impl std::fmt::Display for ShardOrientation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RowMajor => write!(f, "RowMajor"),
+            Self::ColMajor => write!(f, "ColMajor"),
+        }
+    }
+}
+
 impl ShardOrientation {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::RowMajor => 0,
@@ -130,7 +166,37 @@ pub enum DataFormat {
     Invalid,
 }
 
+impl std::fmt::Display for DataFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Float32 => write!(f, "Float32"),
+            Self::Float16 => write!(f, "Float16"),
+            Self::Bfp8 => write!(f, "Bfp8"),
+            Self::Bfp4 => write!(f, "Bfp4"),
+            Self::Bfp2 => write!(f, "Bfp2"),
+            Self::Float16B => write!(f, "Float16B"),
+            Self::Bfp8B => write!(f, "Bfp8B"),
+            Self::Bfp4B => write!(f, "Bfp4B"),
+            Self::Bfp2B => write!(f, "Bfp2B"),
+            Self::Lf8 => write!(f, "Lf8"),
+            Self::Fp8E4M3 => write!(f, "Fp8E4M3"),
+            Self::Int8 => write!(f, "Int8"),
+            Self::Tf32 => write!(f, "Tf32"),
+            Self::UInt8 => write!(f, "UInt8"),
+            Self::UInt16 => write!(f, "UInt16"),
+            Self::Int16 => write!(f, "Int16"),
+            Self::Int32 => write!(f, "Int32"),
+            Self::UInt32 => write!(f, "UInt32"),
+            Self::RawUInt8 => write!(f, "RawUInt8"),
+            Self::RawUInt16 => write!(f, "RawUInt16"),
+            Self::RawUInt32 => write!(f, "RawUInt32"),
+            Self::Invalid => write!(f, "Invalid"),
+        }
+    }
+}
+
 impl DataFormat {
+    #[must_use]
     const fn as_ffi(self) -> u8 {
         match self {
             Self::Float32 => 0,
@@ -205,6 +271,7 @@ impl CoreRange {
         }
     }
 
+    #[must_use]
     fn as_ffi(self) -> ffi::CoreRangeRepr {
         ffi::CoreRangeRepr {
             start_x: self.start.x,
@@ -255,16 +322,53 @@ impl CoreRangeSet {
         self.ranges.push(range);
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ranges.is_empty()
     }
 
+    #[must_use]
     pub fn ranges(&self) -> &[CoreRange] {
         &self.ranges
     }
 
     fn ffi_ranges(&self) -> Vec<ffi::CoreRangeRepr> {
         self.ranges.iter().copied().map(CoreRange::as_ffi).collect()
+    }
+}
+
+impl IntoIterator for CoreRangeSet {
+    type Item = CoreRange;
+    type IntoIter = std::vec::IntoIter<CoreRange>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.ranges.into_iter()
+    }
+}
+
+impl FromIterator<CoreRange> for CoreRangeSet {
+    fn from_iter<I: IntoIterator<Item = CoreRange>>(iter: I) -> Self {
+        Self {
+            ranges: iter.into_iter().collect(),
+        }
+    }
+}
+
+impl Extend<CoreRange> for CoreRangeSet {
+    fn extend<I: IntoIterator<Item = CoreRange>>(&mut self, iter: I) {
+        self.ranges.extend(iter);
+    }
+}
+
+impl From<CoreRange> for CoreRangeSet {
+    fn from(range: CoreRange) -> Self {
+        Self::from_range(range)
+    }
+}
+
+impl From<LogicalCore> for CoreRangeSet {
+    fn from(core: LogicalCore) -> Self {
+        Self::from_core(core)
     }
 }
 
@@ -356,6 +460,7 @@ impl InterleavedBufferConfig {
         }
     }
 
+    #[must_use]
     fn as_ffi(self) -> ffi::InterleavedBufferConfigRepr {
         ffi::InterleavedBufferConfigRepr {
             size: self.size,
@@ -391,6 +496,7 @@ impl ShardedBufferConfig {
         }
     }
 
+    #[must_use]
     fn as_ffi(&self) -> ffi::ShardedBufferConfigRepr {
         ffi::ShardedBufferConfigRepr {
             size: self.size,
@@ -452,6 +558,18 @@ pub struct Buffer {
     pub(crate) inner: cxx::UniquePtr<ffi::BufferHandle>,
 }
 
+impl std::fmt::Debug for Buffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Buffer")
+            .field("address", &self.address())
+            .field("size", &self.size())
+            .field("page_size", &self.page_size())
+            .field("buffer_type", &self.buffer_type())
+            .field("is_allocated", &self.is_allocated())
+            .finish()
+    }
+}
+
 impl Buffer {
     pub fn create_interleaved(
         device: &Device,
@@ -488,30 +606,37 @@ impl Buffer {
             .info()
     }
 
+    #[must_use]
     pub fn is_allocated(&self) -> bool {
         self.info().is_allocated
     }
 
+    #[must_use]
     pub fn address(&self) -> u32 {
         self.info().address
     }
 
+    #[must_use]
     pub fn size(&self) -> u64 {
         self.info().size
     }
 
+    #[must_use]
     pub fn page_size(&self) -> u64 {
         self.info().page_size
     }
 
+    #[must_use]
     pub fn buffer_type(&self) -> BufferType {
         BufferType::from_ffi(self.info().buffer_type)
     }
 
+    #[must_use]
     pub fn buffer_layout(&self) -> TensorMemoryLayout {
         TensorMemoryLayout::from_ffi(self.info().buffer_layout)
     }
 
+    #[must_use]
     pub fn sub_device_id(&self) -> Option<SubDeviceId> {
         let info = self.info();
         info.has_sub_device_id
@@ -538,6 +663,13 @@ impl Buffer {
 
 pub struct CircularBufferConfig {
     inner: cxx::UniquePtr<ffi::CircularBufferConfigHandle>,
+}
+
+impl std::fmt::Debug for CircularBufferConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CircularBufferConfig")
+            .finish_non_exhaustive()
+    }
 }
 
 impl CircularBufferConfig {
@@ -602,6 +734,15 @@ pub struct CircularBufferIndex<'a> {
     config: &'a mut CircularBufferConfig,
     buffer_index: u8,
     remote: bool,
+}
+
+impl std::fmt::Debug for CircularBufferIndex<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CircularBufferIndex")
+            .field("buffer_index", &self.buffer_index)
+            .field("remote", &self.remote)
+            .finish()
+    }
 }
 
 impl CircularBufferIndex<'_> {
